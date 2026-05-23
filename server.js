@@ -327,6 +327,12 @@ async function searchWithGoogle(query, market = 'SA') {
     const API_KEY = process.env.SERP_API_KEY;
     if (!API_KEY) return null;
 
+    // تأكد من وجود query
+    if (!query || query.trim() === '') {
+      console.error('SerpAPI: empty query');
+      return null;
+    }
+
     // حدد اللغة والبلد حسب السوق
     const marketParams = {
       SA: 'gl=sa&hl=ar',
@@ -378,9 +384,11 @@ app.post('/api/search', async (req, res) => {
     const { queries, query, market = 'SA', wantCheaper = false } = req.body;
     const searchTerms = queries || [query];
 
-    // ── المرحلة ١: جرب Google Custom Search أولاً ──
+    // ── المرحلة ١: جرب SerpAPI أولاً ──
     let allProducts = [];
-    for (const q of searchTerms.slice(0, 3)) {
+    const validTerms = searchTerms.filter(q => q && q.trim().length > 0);
+    console.log('Search terms:', validTerms);
+    for (const q of validTerms.slice(0, 3)) {
       const googleResults = await searchWithGoogle(
         wantCheaper ? `${q} budget affordable` : q,
         market
