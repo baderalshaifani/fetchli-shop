@@ -254,21 +254,24 @@ function buildFallbackFromVision(visionData, message, wantCheaper) {
     if (allText.includes(en)) { productType = ar; break; }
   }
 
-  const baseQuery = brand ? `${brand} ${guess}` : guess || labels;
-  const cheaper   = wantCheaper ? 'budget affordable alternative' : '';
+  const cheaper = wantCheaper ? 'budget affordable' : '';
+
+  // بناء كلمات بحث قوية من بيانات Vision
+  const q1 = [brand, guess, color].filter(Boolean).join(' ').trim() || message || 'product';
+  const q2 = [guess, color].filter(Boolean).join(' ').trim() || q1;
+  const q3 = cheaper ? `${q1} ${cheaper}` : `${guess} buy online`;
+  const q4 = [brand, productType === 'ساعة' ? 'watch' : productType === 'حقيبة' ? 'bag' : guess].filter(Boolean).join(' ');
+  const q5 = message || brand || guess || 'product';
+
+  const queries = [q1, q2, q3, q4, q5].filter(q => q && q.trim().length > 1);
+  console.log('Fallback queries:', queries);
 
   return {
     productType,
     brand,
     color,
     details: objects,
-    searchQueries: [
-      brand ? `${brand} ${guess} ${color}`.trim() : guess,
-      `${guess} ${color}`.trim(),
-      `${cheaper || productType} ${color}`.trim(),
-      objects || guess,
-      brand || guess,
-    ].filter(Boolean).slice(0, 5),
+    searchQueries: queries.length > 0 ? queries : [message || brand || 'product'],
     reply: `وجدت ${productType}${brand ? ' من ' + brand : ''} — جاري البحث عن أفضل الأسعار`,
     confidence: 82,
   };
