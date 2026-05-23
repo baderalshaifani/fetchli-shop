@@ -295,14 +295,10 @@ body {
 
 /* ── صورة المستخدم المرفوعة ── */
 .img-preview {
-  max-width: 200px;
-  max-height: 200px;
-  width: auto;
-  height: auto;
-  border-radius: 12px;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  display: block;
+  max-width: 200px; max-height: 200px;
+  width: auto; height: auto;
+  border-radius: 12px; object-fit: contain;
+  border: 1px solid var(--border); display: block;
 }
 
 /* ── Typing wrapper ── */
@@ -311,6 +307,83 @@ body {
 
 /* ── Cheaper label ── */
 .cheaper-label { font-size: 12px; color: var(--gold); padding: 2px 4px; opacity: .8; }
+
+/* ── Browser Popup (iframe داخل الشات) ── */
+.browser-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(10px);
+  z-index: 300;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 16px;
+}
+.browser-overlay.active { display: flex; }
+.browser-window {
+  width: 100%; max-width: 960px;
+  height: 88vh;
+  background: var(--bg3);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: popIn .25s ease;
+}
+@keyframes popIn {
+  from { transform: scale(.95); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.browser-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.browser-dots { display: flex; gap: 6px; }
+.browser-dots span {
+  width: 11px; height: 11px; border-radius: 50%;
+}
+.browser-dots span:nth-child(1) { background: #ff5f57; }
+.browser-dots span:nth-child(2) { background: #febc2e; }
+.browser-dots span:nth-child(3) { background: #28c840; }
+.browser-url {
+  flex: 1; background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 12px;
+  font-size: 12px; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  direction: ltr; text-align: left;
+}
+.browser-close {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: rgba(255,255,255,0.06); border: none;
+  color: var(--text2); cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; flex-shrink: 0;
+}
+.browser-close:hover { background: rgba(255,80,80,0.2); color: #ff5f57; }
+.browser-iframe {
+  flex: 1; border: none; width: 100%;
+  background: #fff;
+}
+.browser-blocked {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  color: var(--text2); font-size: 14px; text-align: center;
+  padding: 32px;
+}
+.browser-blocked .store-icon { font-size: 52px; }
+.browser-blocked h3 { font-size: 17px; color: var(--text); }
+.browser-blocked p  { font-size: 13px; line-height: 1.7; max-width: 340px; }
+.browser-open-btn {
+  padding: 11px 28px; border-radius: 12px; border: none;
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #0a0a0f; font-family: 'Tajawal', sans-serif;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: opacity .2s;
+}
+.browser-open-btn:hover { opacity: .85; }
 </style>
 </head>
 <body>
@@ -381,6 +454,28 @@ body {
           اشتري الآن على Amazon ←
         </a>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Browser Popup -->
+<div class="browser-overlay" id="browserOverlay">
+  <div class="browser-window" id="browserWindow">
+    <div class="browser-bar">
+      <div class="browser-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="browser-url" id="browserUrl">https://</div>
+      <button class="browser-close" id="browserClose">✕</button>
+    </div>
+    <iframe class="browser-iframe" id="browserIframe" src="" allowfullscreen
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation">
+    </iframe>
+    <div class="browser-blocked" id="browserBlocked" style="display:none">
+      <div class="store-icon">🛍️</div>
+      <h3 id="blockedStoreName">المتجر</h3>
+      <p>هذا المتجر لا يسمح بالعرض المدمج.<br>اضغط الزر أدناه لفتحه في نافذة منفصلة مع الحفاظ على تجربة التسوق.</p>
+      <button class="browser-open-btn" id="blockedOpenBtn">فتح المتجر ←</button>
     </div>
   </div>
 </div>

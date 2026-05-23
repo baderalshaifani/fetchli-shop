@@ -19,48 +19,94 @@ async function detectLocation() {
 }
 
 // ────────────────────────────────────
-// فتح الرابط داخل التطبيق
-// Custom Tabs (Android) / SFSafariViewController (iOS)
+// فتح الرابط — Browser Popup داخل الشات
+// Custom Tabs (Android) / SFSafari (iOS) / iframe popup (Desktop)
 // ────────────────────────────────────
+
+// المتاجر التي تمنع X-Frame-Options — نعرض fallback تلقائياً
+const BLOCKED_STORES = [
+  'amazon.', 'noon.', 'namshi.', 'shein.', 'aliexpress.',
+  'ebay.', 'etsy.', 'walmart.', 'target.', 'ikea.'
+];
+
+function getStoreName(url) {
+  try {
+    const host = new URL(url).hostname.replace('www.', '');
+    return host.split('.')[0].charAt(0).toUpperCase() + host.split('.')[0].slice(1);
+  } catch { return 'المتجر'; }
+}
+
+function isKnownBlocked(url) {
+  return BLOCKED_STORES.some(s => url.includes(s));
+}
+
 function openInApp(url) {
-  // ── ١. كشف البيئة ──
   const ua        = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
   const isIOS     = /iPhone|iPad|iPod/i.test(ua);
   const isMobile  = isAndroid || isIOS;
+  const insideApp = window.fetchli_app === true || /FetchliApp/i.test(ua);
 
-  // ── ٢. إذا الموقع مفتوح داخل تطبيق fetchli ──
-  //    التطبيق يحقن fetchli_app=true في الـ UA أو window
-  const insideApp = window.fetchli_app === true
-    || /FetchliApp/i.test(ua);
-
+  // ── داخل تطبيق fetchli → Custom Tab / SFSafari ──
   if (insideApp) {
-    // أرسل الرابط للتطبيق عبر postMessage ليفتحه في Custom Tab / SFSafari
     window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'OPEN_URL', url }));
-    // أو Flutter
     window.flutter_inappwebview?.callHandler?.('openUrl', url);
     return;
   }
 
-  // ── ٣. على موبايل خارج التطبيق ──
-  //    نفتح في نفس النافذة (يتحول تلقائياً لـ Custom Tab في Chrome Android
-  //    أو SFSafariViewController في Safari iOS عند استدعاء window.open بدون _blank)
+  // ── موبايل خارج التطبيق → نفس النافذة ──
   if (isMobile) {
     window.location.href = url;
     return;
   }
 
-  // ── ٤. ديسكتوب ← نافذة منبثقة أنيقة ──
-  const w = Math.min(window.innerWidth * 0.85, 1100);
-  const h = Math.min(window.innerHeight * 0.9, 800);
-  const left = (window.innerWidth  - w) / 2 + window.screenX;
-  const top  = (window.innerHeight - h) / 2 + window.screenY;
-  window.open(
-    url,
-    'fetchli_store',
-    `width=${Math.round(w)},height=${Math.round(h)},left=${Math.round(left)},top=${Math.round(top)},toolbar=0,location=1,scrollbars=1,resizable=1`
-  );
+  // ── ديسكتوب → iframe popup داخل الشات ──
+  const overlay   = document.getElementById('browserOverlay');
+  const iframe    = document.getElementById('browserIframe');
+  const urlBar    = document.getElementById('browserUrl');
+  const blocked   = document.getElementById('browserBlocked');
+  const blockedBtn = document.getElementById('blockedOpenBtn');
+  const storeName = document.getElementById('blockedStoreName');
+
+  urlBar.textContent = url;
+  overlay.classList.add('active');
+
+  if (isKnownBlocked(url)) {
+    // متجر معروف بمنع iframe → اعرض fallback فوراً
+    iframe.style.display   = 'none';
+    blocked.style.display  = 'flex';
+    storeName.textContent  = getStoreName(url) + ' 🛍️';
+    blockedBtn.onclick = () => {
+      window.open(url, '_blank', 'noopener');
+    };
+  } else {
+    // جرب iframe
+    iframe.style.display  = 'block';
+    blocked.style.display = 'none';
+    iframe.src = url;
+
+    // لو فشل X-Frame → نكتشفه بعد 3 ثواني
+    iframe.onerror = () => showBlocked(url, storeName, blockedBtn, iframe, blocked);
+    setTimeout(() => {
+      try {
+        // إذا تحمّل بنجاح contentDocument موجود
+        if (!iframe.contentDocument && !iframe.contentWindow?.location?.href) {
+          showBlocked(url, storeName, blockedBtn, iframe, blocked);
+        }
+      } catch {
+        showBlocked(url, storeName, blockedBtn, iframe, blocked);
+      }
+    }, 3000);
+  }
 }
+
+function showBlocked(url, storeName, blockedBtn, iframe, blocked) {
+  iframe.style.display  = 'none';
+  blocked.style.display = 'flex';
+  storeName.textContent = getStoreName(url) + ' 🛍️';
+  blockedBtn.onclick = () => window.open(url, '_blank', 'noopener');
+}
+
 
 // ────────────────────────────────────
 // إرسال رسالة نصية
@@ -260,6 +306,21 @@ function clearInput()   { document.getElementById('msgInput').value = ''; }
 // Event Listeners
 // ────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('browserClose').addEventListener('click', () => {
+    const overlay = document.getElementById('browserOverlay');
+    const iframe  = document.getElementById('browserIframe');
+    overlay.classList.remove('active');
+    iframe.src = '';
+  });
+
+  document.getElementById('browserOverlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('browserOverlay')) {
+      const iframe = document.getElementById('browserIframe');
+      document.getElementById('browserOverlay').classList.remove('active');
+      iframe.src = '';
+    }
+  });
+
   detectLocation();
 
   document.getElementById('msgInput').addEventListener('keydown', (e) => {
