@@ -292,6 +292,25 @@ body {
   text-decoration: none; transition: opacity .2s;
 }
 #ms-link:hover { opacity: .85; }
+
+/* ── صورة المستخدم المرفوعة ── */
+.img-preview {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  border-radius: 12px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+/* ── Typing wrapper ── */
+.typing-wrap-inner { display: flex; flex-direction: column; gap: 5px; }
+.typing-label { font-size: 11px; color: var(--text2); padding-right: 2px; }
+
+/* ── Cheaper label ── */
+.cheaper-label { font-size: 12px; color: var(--gold); padding: 2px 4px; opacity: .8; }
 </style>
 </head>
 <body>
@@ -358,7 +377,7 @@ body {
           <span>✓ دفع آمن</span>
           <span>✓ إرجاع مجاني</span>
         </div>
-        <a id="ms-link" href="#" target="_blank" rel="noopener">
+        <a id="ms-link" href="#">
           اشتري الآن على Amazon ←
         </a>
       </div>
