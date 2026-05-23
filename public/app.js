@@ -19,11 +19,56 @@ async function detectLocation() {
 }
 
 // ────────────────────────────────────
-// إرسال رسالة
+// فتح الرابط داخل التطبيق
+// Custom Tabs (Android) / SFSafariViewController (iOS)
+// ────────────────────────────────────
+function openInApp(url) {
+  // ── ١. كشف البيئة ──
+  const ua        = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  const isIOS     = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile  = isAndroid || isIOS;
+
+  // ── ٢. إذا الموقع مفتوح داخل تطبيق fetchli ──
+  //    التطبيق يحقن fetchli_app=true في الـ UA أو window
+  const insideApp = window.fetchli_app === true
+    || /FetchliApp/i.test(ua);
+
+  if (insideApp) {
+    // أرسل الرابط للتطبيق عبر postMessage ليفتحه في Custom Tab / SFSafari
+    window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'OPEN_URL', url }));
+    // أو Flutter
+    window.flutter_inappwebview?.callHandler?.('openUrl', url);
+    return;
+  }
+
+  // ── ٣. على موبايل خارج التطبيق ──
+  //    نفتح في نفس النافذة (يتحول تلقائياً لـ Custom Tab في Chrome Android
+  //    أو SFSafariViewController في Safari iOS عند استدعاء window.open بدون _blank)
+  if (isMobile) {
+    window.location.href = url;
+    return;
+  }
+
+  // ── ٤. ديسكتوب ← نافذة منبثقة أنيقة ──
+  const w = Math.min(window.innerWidth * 0.85, 1100);
+  const h = Math.min(window.innerHeight * 0.9, 800);
+  const left = (window.innerWidth  - w) / 2 + window.screenX;
+  const top  = (window.innerHeight - h) / 2 + window.screenY;
+  window.open(
+    url,
+    'fetchli_store',
+    `width=${Math.round(w)},height=${Math.round(h)},left=${Math.round(left)},top=${Math.round(top)},toolbar=0,location=1,scrollbars=1,resizable=1`
+  );
+}
+
+// ────────────────────────────────────
+// إرسال رسالة نصية
 // ────────────────────────────────────
 async function sendMessage(text, imageBase64 = null) {
   if (!text && !imageBase64) return;
 
+  // هل يريد أرخص؟
   const wantCheaper = text && /أرخص|رخيص|بديل|أوفر|اقتصادي|cheaper|budget|alternative/i.test(text);
 
   addMessage('user', imageBase64 ? `📸 ${text || 'صورة منتج'}` : text);
@@ -31,65 +76,31 @@ async function sendMessage(text, imageBase64 = null) {
   showTyping('جاري تحليل طلبك...');
 
   try {
-    // ── المرحلة ١: تحليل بـ Claude + Vision ──
-    let analyzed = null;
-    try {
-      const analyzeRes = await fetch(`${API}/api/analyze`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: text, imageBase64, wantCheaper }),
-      });
-      analyzed = await analyzeRes.json();
-    } catch (e) {
-      console.error('Analyze failed:', e);
-    }
+    // ── المرحلة ١: تحليل عميق بـ Claude ──
+    const analyzeRes = await fetch(`${API}/api/analyze`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ message: text, imageBase64, wantCheaper }),
+    });
+    const analyzed = await analyzeRes.json();
 
-    // ── بناء كلمات البحث بشكل موثوق ──
-    let searchQueries = [];
-
-    // أولاً من Claude
-    if (analyzed?.searchQueries?.length > 0) {
-      searchQueries = analyzed.searchQueries.filter(q => q && q.trim().length > 1);
-    }
-
-    // ثانياً من Vision data لو Claude فشل
-    if (searchQueries.length === 0 && analyzed?.visionData) {
-      const v = analyzed.visionData;
-      const brand = v.logos?.[0] || '';
-      const guess = v.bestGuess || '';
-      const obj   = v.objects?.[0] || '';
-      const q = [brand, guess, obj].filter(Boolean).join(' ').trim();
-      if (q) searchQueries = [q, brand || guess, guess || obj].filter(Boolean);
-    }
-
-    // ثالثاً من النص المدخل
-    if (searchQueries.length === 0 && text && text.trim().length > 1) {
-      searchQueries = [text.trim()];
-    }
-
-    // رابعاً emergency fallback
-    if (searchQueries.length === 0) {
-      searchQueries = ['trending products'];
-    }
-
-    console.log('Final search queries:', searchQueries);
     updateTyping('جاري البحث في المتاجر...');
 
-    // ── المرحلة ٢: بحث في المتاجر ──
+    // ── المرحلة ٢: بحث متعدد بـ 5 كلمات ──
     const searchRes = await fetch(`${API}/api/search`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        queries:     searchQueries,
+        queries:     analyzed.searchQueries || [text],
         market:      userLocation.market || 'SA',
         wantCheaper,
       }),
     });
     const { products, mock } = await searchRes.json();
 
-    // ── المرحلة ٣: تصفية بـ Claude ──
+    // ── المرحلة ٣: تصفية بـ Claude للدقة العالية ──
     let finalProducts = products;
-    if (products?.length > 3 && analyzed?.productType) {
+    if (products?.length > 3 && analyzed.productType) {
       updateTyping('جاري اختيار الأفضل لك...');
       try {
         const filterRes = await fetch(`${API}/api/filter`, {
@@ -105,12 +116,12 @@ async function sendMessage(text, imageBase64 = null) {
     removeTyping();
 
     // ── عرض النتائج ──
-    const confidence = analyzed?.confidence || 85;
-    const reply = analyzed?.reply || `وجدت ${finalProducts?.length || 0} منتجات`;
-    const detailLine = analyzed?.productType
-      ? `\n🔍 ${analyzed.productType}${analyzed.brand ? ' • ' + analyzed.brand : ''}${analyzed.color ? ' • ' + analyzed.color : ''}`
+    const confidence = analyzed.confidence || 90;
+    const reply = analyzed.reply || `وجدت لك ${finalProducts.length} منتجات مطابقة`;
+    const detailLine = analyzed.productType
+      ? `\n🔍 ${analyzed.productType}${analyzed.brand ? ` • ${analyzed.brand}` : ''}${analyzed.color ? ` • ${analyzed.color}` : ''}`
       : '';
-    const mockNote = mock ? '\n\n_نتائج تجريبية — سيتم ربط المتاجر قريباً_' : '';
+    const mockNote = mock ? '\n\n_نتائج تجريبية — سيتم ربط Amazon قريباً_' : '';
     const accuracyNote = `\n✦ دقة التطابق: ${confidence}٪`;
 
     addMessage('ai', reply + detailLine + accuracyNote + mockNote);
@@ -129,11 +140,12 @@ async function sendMessage(text, imageBase64 = null) {
 // ────────────────────────────────────
 function handleImageUpload(file) {
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = (e) => {
     const base64 = e.target.result.split(',')[1];
     addImagePreview(e.target.result);
-    sendMessage('', base64);
+    sendMessage('أبي منتجات مشابهة', base64);
   };
   reader.readAsDataURL(file);
 }
@@ -175,11 +187,12 @@ function addProducts(products, cheaper = false) {
   }
   const grid = document.createElement('div');
   grid.className = 'products-grid';
+
+  // ── التغيير الرئيسي: btn-buy يستخدم openInApp بدل target="_blank" ──
   grid.innerHTML = products.map(p => `
     <div class="product-card">
       <div class="product-img-wrap">
-        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy"
-          onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'">
+        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
         <span class="product-badge">${p.badge || ''}</span>
       </div>
       <div class="product-body">
@@ -193,13 +206,14 @@ function addProducts(products, cheaper = false) {
           <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
             التفاصيل
           </button>
-          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">
+          <button class="btn-buy" onclick="openInApp('${p.url.replace(/'/g, "\\'")}')">
             اشتري ←
-          </a>
+          </button>
         </div>
       </div>
     </div>
   `).join('');
+
   chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -209,7 +223,12 @@ function openProduct(p) {
   document.getElementById('ms-store').textContent = p.store;
   document.getElementById('ms-price').textContent = p.price;
   document.getElementById('ms-img').src           = p.image;
-  document.getElementById('ms-link').href         = p.url;
+
+  // ── التغيير: ms-link يستخدم openInApp أيضاً ──
+  const link = document.getElementById('ms-link');
+  link.onclick = (e) => { e.preventDefault(); openInApp(p.url); };
+  link.href    = p.url;
+
   document.getElementById('ministore').style.display = 'flex';
 }
 
