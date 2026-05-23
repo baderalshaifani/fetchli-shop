@@ -320,77 +320,52 @@ app.post('/api/analyze', async (req, res) => {
 
 
 // ────────────────────────────────────
-// Google Custom Search — نتائج حقيقية
+// SerpAPI — نتائج Google Shopping حقيقية
 // ────────────────────────────────────
 async function searchWithGoogle(query, market = 'SA') {
   try {
-    const API_KEY = process.env.GOOGLE_SEARCH_KEY;
-    const CX      = process.env.GOOGLE_SEARCH_CX;
-    if (!API_KEY || !CX) return null;
+    const API_KEY = process.env.SERP_API_KEY;
+    if (!API_KEY) return null;
 
-    // أضف السوق للبحث
-    const marketSuffix = {
-      SA: 'site:amazon.sa OR site:noon.com',
-      AE: 'site:amazon.ae OR site:noon.com',
-      EG: 'site:amazon.eg OR site:jumia.com.eg',
-      US: 'site:amazon.com OR site:aliexpress.com',
+    // حدد اللغة والبلد حسب السوق
+    const marketParams = {
+      SA: 'gl=sa&hl=ar',
+      AE: 'gl=ae&hl=ar',
+      EG: 'gl=eg&hl=ar',
+      US: 'gl=us&hl=en',
+      CA: 'gl=ca&hl=en',
     };
-    const suffix = marketSuffix[market] || marketSuffix['SA'];
-    const fullQuery = `${query} ${suffix}`;
+    const params = marketParams[market] || marketParams['SA'];
 
-    const url = `https://www.googleapis.com/customsearch/v1?key=${API_KEY}&cx=${CX}&q=${encodeURIComponent(fullQuery)}&num=6`;
+    const url = `https://serpapi.com/search?engine=google_shopping&q=${encodeURIComponent(query)}&${params}&api_key=${API_KEY}&num=6`;
 
     const response = await fetch(url);
     const data     = await response.json();
 
-    // طباعة الخطأ كاملاً للتشخيص
     if (data.error) {
-      console.error('Google Search API Error:', JSON.stringify(data.error));
+      console.error('SerpAPI Error:', data.error);
       return null;
     }
 
-    console.log('Google Search success:', data.items?.length, 'results for:', query);
-    if (!data.items?.length) return null;
+    const results = data.shopping_results || [];
+    console.log('SerpAPI success:', results.length, 'results for:', query);
 
-    // حول النتائج لصيغة المنتجات
-    return data.items.map((item, i) => {
-      // استخرج السعر من الوصف لو موجود
-      const priceMatch = item.snippet?.match(/[\$﷼ر\.س]+\s*[\d,]+|[\d,]+\s*[\$﷼]|SAR\s*[\d,]+/i);
-      const price      = priceMatch ? priceMatch[0] : null;
+    if (!results.length) return null;
 
-      // حدد المتجر من الرابط
-      const storeName = item.displayLink
-        ?.replace('www.', '')
-        ?.replace('.com', '')
-        ?.replace('.sa', '')
-        ?.replace('.ae', '') || 'متجر';
-
-      // صورة المنتج
-      const image = item.pagemap?.cse_image?.[0]?.src
-        || item.pagemap?.product?.[0]?.image
-        || `https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop`;
-
-      // السعر من pagemap
-      const productPrice = item.pagemap?.offer?.[0]?.price
-        || item.pagemap?.product?.[0]?.price
-        || price
-        || null;
-
-      return {
-        id:     `g-${i}`,
-        name:   item.title?.slice(0, 60) || query,
-        price:  productPrice ? `${productPrice}` : 'تحقق من السعر',
-        store:  storeName,
-        image,
-        url:    item.link,
-        badge:  i === 0 ? 'أفضل نتيجة' : i === 1 ? 'الأكثر مبيعاً' : '',
-        rating: (4 + Math.random() * 0.9).toFixed(1),
-        source: 'google',
-      };
-    }).filter(Boolean);
+    return results.slice(0, 6).map((item, i) => ({
+      id:     `s-${i}`,
+      name:   item.title?.slice(0, 60) || query,
+      price:  item.price || 'تحقق من السعر',
+      store:  item.source || 'متجر',
+      image:  item.thumbnail || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
+      url:    item.product_link || item.link || '#',
+      badge:  i === 0 ? 'أفضل نتيجة' : i === 1 ? 'الأكثر مبيعاً' : '',
+      rating: item.rating ? String(item.rating) : (4 + Math.random() * 0.9).toFixed(1),
+      source: 'serp',
+    }));
 
   } catch (err) {
-    console.error('Google Search error:', err.message);
+    console.error('SerpAPI error:', err.message);
     return null;
   }
 }
