@@ -324,7 +324,7 @@ app.post('/api/analyze', async (req, res) => {
 // ────────────────────────────────────
 async function searchWithGoogle(query, market = 'SA') {
   try {
-    const API_KEY = process.env.GOOGLE_VISION_KEY;
+    const API_KEY = process.env.GOOGLE_SEARCH_KEY;
     const CX      = process.env.GOOGLE_SEARCH_CX;
     if (!API_KEY || !CX) return null;
 
