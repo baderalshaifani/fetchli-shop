@@ -387,6 +387,16 @@ app.post('/api/search', async (req, res) => {
     const { queries, query, market = 'SA', wantCheaper = false } = req.body;
     const searchTerms = queries || [query];
 
+    // ── Emergency fallback لو كل الـ queries فارغة ──
+    if (!searchTerms || searchTerms.length === 0 || searchTerms.every(q => !q || q.trim() === '')) {
+      console.log('All queries empty - using generic fallback');
+      const fallbackResults = await searchWithGoogle('trending products', market);
+      if (fallbackResults?.length) {
+        return res.json({ products: fallbackResults.slice(0, 6), mock: false, source: 'serp' });
+      }
+      return res.json({ products: getMockProducts('products', market, false, 0), mock: true });
+    }
+
     // ── المرحلة ١: جرب SerpAPI أولاً ──
     let allProducts = [];
     const validTerms = searchTerms.filter(q => q && q.trim().length > 0);
