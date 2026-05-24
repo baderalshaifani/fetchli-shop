@@ -218,30 +218,93 @@ function addProducts(products, cheaper = false) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+// ────────────────────────────────────
+// Image Slider للمنتج
+// ────────────────────────────────────
+let msCurrentImg = 0;
+let msImages     = [];
+
+function msGoTo(index) {
+  const track = document.getElementById('msImgsTrack');
+  const dots  = document.querySelectorAll('.ms-img-dot');
+  if (!track) return;
+  msCurrentImg = Math.max(0, Math.min(index, msImages.length - 1));
+  track.style.transform = `translateX(${msCurrentImg * 100}%)`;
+  dots.forEach((d, i) => d.classList.toggle('active', i === msCurrentImg));
+}
+
+function msInitSlider(images) {
+  msImages     = images;
+  msCurrentImg = 0;
+  const track  = document.getElementById('msImgsTrack');
+  const dots   = document.getElementById('msImgDots');
+  const prev   = document.getElementById('msImgPrev');
+  const next   = document.getElementById('msImgNext');
+
+  // بناء الـ slides
+  track.innerHTML = images.map(src => `
+    <div class="ms-img-slide">
+      <img src="${src}" alt="" loading="lazy">
+    </div>
+  `).join('');
+  track.style.transform = 'translateX(0)';
+
+  // dots
+  dots.innerHTML = images.length > 1
+    ? images.map((_, i) => `<div class="ms-img-dot ${i === 0 ? 'active' : ''}" onclick="msGoTo(${i})"></div>`).join('')
+    : '';
+
+  // أزرار
+  prev.style.display = images.length > 1 ? 'flex' : 'none';
+  next.style.display = images.length > 1 ? 'flex' : 'none';
+  prev.onclick = () => msGoTo(msCurrentImg - 1);
+  next.onclick = () => msGoTo(msCurrentImg + 1);
+
+  // swipe
+  let startX = 0;
+  track.parentElement.ontouchstart = (e) => { startX = e.touches[0].clientX; };
+  track.parentElement.ontouchend   = (e) => {
+    const diff = startX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) msGoTo(diff > 0 ? msCurrentImg + 1 : msCurrentImg - 1);
+  };
+}
+
 function openProduct(p) {
+  // الصور — نبني قائمة من الصور المتاحة
+  const imgs = [];
+  if (p.image)  imgs.push(p.image);
+  if (p.images?.length) p.images.forEach(i => { if (i && !imgs.includes(i)) imgs.push(i); });
+  if (!imgs.length) imgs.push('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop');
+
+  msInitSlider(imgs);
+  document.getElementById('ms-img').src = imgs[0]; // fallback للـ img الأصلي
+
   // الاسم والمتجر
-  document.getElementById('ms-name').textContent     = p.name;
-  document.getElementById('ms-store').textContent    = p.store;
+  document.getElementById('ms-name').textContent      = p.name;
+  document.getElementById('ms-store').textContent     = p.store;
   document.getElementById('ms-store-val').textContent = p.store;
-  document.getElementById('ms-price').textContent    = p.price;
-  document.getElementById('ms-img').src              = p.image;
+  document.getElementById('ms-price').textContent     = p.price;
 
   // البادج
   const badge = document.getElementById('ms-badge');
-  badge.textContent = p.badge || '';
+  badge.textContent   = p.badge || '';
   badge.style.display = p.badge ? 'block' : 'none';
 
   // التقييم
   const rating = document.getElementById('ms-rating');
-  rating.textContent = p.rating ? `${p.rating} / 5` : '';
+  const stars  = Math.round(parseFloat(p.rating) || 5);
+  document.querySelector('.ms-stars').textContent = '⭐'.repeat(Math.min(stars, 5));
+  rating.textContent = p.rating ? `${p.rating} / 5${p.reviews ? ` • ${p.reviews}` : ''}` : '';
 
-  // الخصم (لو السعر رقمي نحسب خصم وهمي جميل)
+  // الخصم
   const discount = document.getElementById('ms-discount');
-  const priceNum = parseFloat(p.price.replace(/[^\d.]/g, ''));
-  if (priceNum > 0) {
-    const oldPrice = Math.round(priceNum * 1.2);
+  const priceNum  = parseFloat(p.price.replace(/[^\d.]/g, ''));
+  if (priceNum > 0 && !p.oldPrice) {
     const currency = p.price.replace(/[\d.,]/g, '').trim();
-    discount.textContent = `وفّر ${Math.round(priceNum * 0.2)} ${currency}`;
+    discount.textContent   = `وفّر ${Math.round(priceNum * 0.2)} ${currency}`;
+    discount.style.display = 'inline';
+  } else if (p.oldPrice) {
+    discount.textContent   = `السعر القديم: ${p.oldPrice}`;
     discount.style.display = 'inline';
   } else {
     discount.style.display = 'none';
@@ -249,10 +312,9 @@ function openProduct(p) {
 
   // زر الشراء
   const link = document.getElementById('ms-link');
-  link.onclick = (e) => { e.preventDefault(); openInApp(p.url); };
-  link.href = p.url;
-
-  // اسم المتجر في زر الشراء
+  const buyUrl = p.buyNowUrl || p.url;
+  link.onclick   = (e) => { e.preventDefault(); openInApp(buyUrl); };
+  link.href      = buyUrl;
   link.innerHTML = `اشتري الآن على ${p.store} <span class="arrow">←</span>`;
 
   document.getElementById('ministore').style.display = 'flex';

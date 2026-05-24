@@ -311,6 +311,19 @@ body {
   background: var(--bg2);
   overflow: hidden; flex-shrink: 0;
 }
+.ms-imgs-track {
+  display: flex; height: 100%;
+  transition: transform .3s ease;
+}
+.ms-img-slide {
+  min-width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.ms-img-slide img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
 #ms-img {
   width: 100%; height: 100%;
   object-fit: contain;
@@ -321,7 +334,33 @@ body {
   background: rgba(200,160,85,0.92); color: #0a0a0f;
   font-size: 10px; font-weight: 700;
   padding: 3px 10px; border-radius: 20px;
+  z-index: 2;
 }
+.ms-img-dots {
+  position: absolute; bottom: 10px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 5px; z-index: 2;
+}
+.ms-img-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  cursor: pointer; transition: all .2s;
+}
+.ms-img-dot.active {
+  background: var(--gold);
+  width: 18px; border-radius: 3px;
+}
+.ms-img-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0,0,0,0.4); border: none;
+  color: #fff; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2; transition: background .2s;
+}
+.ms-img-arrow:hover { background: rgba(0,0,0,0.7); }
+.ms-img-arrow.prev { right: 10px; }
+.ms-img-arrow.next { left: 10px; }
 
 /* ── تفاصيل المنتج ── */
 .ms-details {
@@ -468,10 +507,17 @@ body {
     <!-- Body -->
     <div class="ms-body">
 
-      <!-- صورة المنتج -->
-      <div class="ms-images">
-        <img id="ms-img" src="" alt="">
+      <!-- صور المنتج — slider -->
+      <div class="ms-images" id="msImages">
+        <div class="ms-imgs-track" id="msImgsTrack">
+          <div class="ms-img-slide">
+            <img id="ms-img" src="" alt="">
+          </div>
+        </div>
         <span class="ms-img-badge" id="ms-badge"></span>
+        <div class="ms-img-dots" id="msImgDots"></div>
+        <button class="ms-img-arrow prev" id="msImgPrev">›</button>
+        <button class="ms-img-arrow next" id="msImgNext">‹</button>
       </div>
 
       <!-- التفاصيل -->
@@ -517,8 +563,6 @@ body {
 
   </div>
 </div>
-<meta name='impact-site-verification' value='a1d8e0c5-64d8-43b2-8d6c-25ed2de17db1'>
 <script src="app.js"></script>
-<!-- Impact Verification -->
 </body>
 </html>
