@@ -23,43 +23,26 @@ async function detectLocation() {
 // Custom Tabs (Android) / SFSafariViewController (iOS)
 // ────────────────────────────────────
 function openInApp(url) {
-  // ── ١. كشف البيئة ──
   const ua        = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
   const isIOS     = /iPhone|iPad|iPod/i.test(ua);
-  const isMobile  = isAndroid || isIOS;
+  const insideApp = window.fetchli_app === true || /FetchliApp/i.test(ua);
 
-  // ── ٢. إذا الموقع مفتوح داخل تطبيق fetchli ──
-  //    التطبيق يحقن fetchli_app=true في الـ UA أو window
-  const insideApp = window.fetchli_app === true
-    || /FetchliApp/i.test(ua);
-
+  // داخل تطبيق fetchli → Custom Tab / SFSafari
   if (insideApp) {
-    // أرسل الرابط للتطبيق عبر postMessage ليفتحه في Custom Tab / SFSafari
     window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'OPEN_URL', url }));
-    // أو Flutter
     window.flutter_inappwebview?.callHandler?.('openUrl', url);
     return;
   }
 
-  // ── ٣. على موبايل خارج التطبيق ──
-  //    نفتح في نفس النافذة (يتحول تلقائياً لـ Custom Tab في Chrome Android
-  //    أو SFSafariViewController في Safari iOS عند استدعاء window.open بدون _blank)
-  if (isMobile) {
+  // موبايل → نفس النافذة (Custom Tab تلقائي)
+  if (isAndroid || isIOS) {
     window.location.href = url;
     return;
   }
 
-  // ── ٤. ديسكتوب ← نافذة منبثقة أنيقة ──
-  const w = Math.min(window.innerWidth * 0.85, 1100);
-  const h = Math.min(window.innerHeight * 0.9, 800);
-  const left = (window.innerWidth  - w) / 2 + window.screenX;
-  const top  = (window.innerHeight - h) / 2 + window.screenY;
-  window.open(
-    url,
-    'fetchli_store',
-    `width=${Math.round(w)},height=${Math.round(h)},left=${Math.round(left)},top=${Math.round(top)},toolbar=0,location=1,scrollbars=1,resizable=1`
-  );
+  // ديسكتوب → نفس النافذة أيضاً
+  window.location.href = url;
 }
 
 // ────────────────────────────────────
@@ -188,8 +171,11 @@ function addProducts(products, cheaper = false) {
   const grid = document.createElement('div');
   grid.className = 'products-grid';
 
-  // ── التغيير الرئيسي: btn-buy يستخدم openInApp بدل target="_blank" ──
-  grid.innerHTML = products.map(p => `
+  grid.innerHTML = products.map((p, idx) => {
+    // نحفظ المنتج في مصفوفة عالمية بدل inline JSON
+    window._fetchliProducts = window._fetchliProducts || [];
+    window._fetchliProducts[idx] = p;
+    return `
     <div class="product-card">
       <div class="product-img-wrap">
         <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
@@ -203,16 +189,16 @@ function addProducts(products, cheaper = false) {
         </div>
         <div class="product-price">${p.price}</div>
         <div class="product-actions">
-          <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
+          <button class="btn-details" onclick="openProduct(window._fetchliProducts[${idx}])">
             التفاصيل
           </button>
-          <button class="btn-buy" onclick="openInApp('${p.url.replace(/'/g, "\\'")}')">
+          <button class="btn-buy" onclick="openProduct(window._fetchliProducts[${idx}]); setTimeout(()=>document.getElementById('ms-link').click(), 100)">
             اشتري ←
           </button>
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
