@@ -8,6 +8,24 @@ const fetch   = require('node-fetch');
 const path    = require('path');
 const config  = require('./config');
 
+// ── Providers (كل متجر في ملف منفصل) ──
+const { searchSerp }       = require('./providers/serp');
+const { searchAmazon, getProductByASIN, AMAZON_ENABLED }   = require('./providers/amazon');
+const { searchAliExpress, ALIEXPRESS_ENABLED } = require('./providers/aliexpress');
+const { searchJumia, JUMIA_ENABLED }           = require('./providers/jumia');
+const { searchNoon, NOON_ENABLED }             = require('./providers/noon');
+const { searchLazada, LAZADA_ENABLED }         = require('./providers/lazada');
+
+console.log(`
+🛒 fetchli Providers:
+  SerpAPI:    ✅ شغّال
+  Amazon:     ${AMAZON_ENABLED     ? '✅ مفعّل' : '🔴 معطّل'}
+  AliExpress: ${ALIEXPRESS_ENABLED ? '✅ مفعّل' : '🔴 معطّل'}
+  Jumia:      ${JUMIA_ENABLED      ? '✅ مفعّل' : '🔴 معطّل'}
+  Noon:       ${NOON_ENABLED       ? '✅ مفعّل' : '🔴 معطّل'}
+  Lazada:     ${LAZADA_ENABLED     ? '✅ مفعّل' : '🔴 معطّل'}
+`);
+
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -323,110 +341,71 @@ app.post('/api/analyze', async (req, res) => {
 
 
 // ────────────────────────────────────
-// SerpAPI — نتائج Google Shopping حقيقية
-// ────────────────────────────────────
-async function searchWithGoogle(query, market = 'SA') {
-  try {
-    const API_KEY = process.env.SERP_API_KEY;
-    if (!API_KEY) return null;
-
-    // تأكد من وجود query
-    if (!query || query.trim() === '') {
-      console.error('SerpAPI: empty query');
-      return null;
-    }
-
-    // حدد اللغة والبلد حسب السوق
-    const marketParams = {
-      SA: 'gl=sa&hl=ar',
-      AE: 'gl=ae&hl=ar',
-      EG: 'gl=eg&hl=ar',
-      US: 'gl=us&hl=en',
-      CA: 'gl=ca&hl=en',
-    };
-    const params = marketParams[market] || marketParams['SA'];
-
-    const url = `https://serpapi.com/search?engine=google_shopping&q=${encodeURIComponent(query)}&${params}&api_key=${API_KEY}&num=6`;
-
-    const response = await fetch(url);
-    const data     = await response.json();
-
-    if (data.error) {
-      console.error('SerpAPI Error:', data.error);
-      return null;
-    }
-
-    const results = data.shopping_results || [];
-    console.log('SerpAPI success:', results.length, 'results for:', query);
-
-    if (!results.length) return null;
-
-    return results.slice(0, 6).map((item, i) => ({
-      id:     `s-${i}`,
-      name:   item.title?.slice(0, 60) || query,
-      price:  item.price || 'تحقق من السعر',
-      store:  item.source || 'متجر',
-      image:  item.thumbnail || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
-      url:    item.product_link || item.link || '#',
-      badge:  i === 0 ? 'أفضل نتيجة' : i === 1 ? 'الأكثر مبيعاً' : '',
-      rating: item.rating ? String(item.rating) : (4 + Math.random() * 0.9).toFixed(1),
-      source: 'serp',
-    }));
-
-  } catch (err) {
-    console.error('SerpAPI error:', err.message);
-    return null;
-  }
-}
-
-// ────────────────────────────────────
-// 5. البحث في المتاجر
+// 5. البحث في المتاجر — متعدد المصادر
 // ────────────────────────────────────
 app.post('/api/search', async (req, res) => {
   try {
     const { queries, query, market = 'SA', wantCheaper = false } = req.body;
     const searchTerms = queries || [query];
 
-    // ── Emergency fallback لو كل الـ queries فارغة ──
-    if (!searchTerms || searchTerms.length === 0 || searchTerms.every(q => !q || q.trim() === '')) {
-      console.log('All queries empty - using generic fallback');
-      const fallbackResults = await searchWithGoogle('trending products', market);
-      if (fallbackResults?.length) {
-        return res.json({ products: fallbackResults.slice(0, 6), mock: false, source: 'serp' });
-      }
+    if (!searchTerms?.length || searchTerms.every(q => !q?.trim())) {
       return res.json({ products: getMockProducts('products', market, false, 0), mock: true });
     }
 
-    // ── المرحلة ١: جرب SerpAPI أولاً ──
-    let allProducts = [];
-    const validTerms = searchTerms.filter(q => q && q.trim().length > 0);
-    console.log('Search terms:', validTerms);
+    const validTerms = searchTerms.filter(q => q?.trim().length > 0);
+    let allProducts  = [];
+
+    // ── البحث في كل provider متاح ──────
     for (const q of validTerms.slice(0, 3)) {
-      const googleResults = await searchWithGoogle(
-        wantCheaper ? `${q} budget affordable` : q,
-        market
-      );
-      if (googleResults?.length) {
-        allProducts.push(...googleResults);
+
+      // ١. SerpAPI (شغّال دائماً)
+      const serpResults = await searchSerp(q, market, wantCheaper);
+      if (serpResults?.length) allProducts.push(...serpResults);
+
+      // ٢. Amazon (إذا مفعّل)
+      if (AMAZON_ENABLED) {
+        const amzMarket  = ['SA','US','UK'].includes(market) ? market : 'US';
+        const amzResults = await searchAmazon(q, amzMarket, wantCheaper);
+        if (amzResults?.length) allProducts.push(...amzResults);
+      }
+
+      // ٣. AliExpress (إذا مفعّل)
+      if (ALIEXPRESS_ENABLED) {
+        const aliResults = await searchAliExpress(q, market, wantCheaper);
+        if (aliResults?.length) allProducts.push(...aliResults);
+      }
+
+      // ٤. Noon (إذا مفعّل وسوق مدعوم)
+      if (NOON_ENABLED && ['SA','AE','EG'].includes(market)) {
+        const noonResults = await searchNoon(q, market, wantCheaper);
+        if (noonResults?.length) allProducts.push(...noonResults);
+      }
+
+      // ٥. Jumia (إذا مفعّل وسوق أفريقي)
+      if (JUMIA_ENABLED && ['EG','NG','KE','MA','TN'].includes(market)) {
+        const jumiaResults = await searchJumia(q, market, wantCheaper);
+        if (jumiaResults?.length) allProducts.push(...jumiaResults);
+      }
+
+      // ٦. Lazada (إذا مفعّل وسوق آسيوي)
+      if (LAZADA_ENABLED && ['SG','MY','TH','PH','ID','VN'].includes(market)) {
+        const lazadaResults = await searchLazada(q, market, wantCheaper);
+        if (lazadaResults?.length) allProducts.push(...lazadaResults);
       }
     }
 
-    // ── المرحلة ٢: لو Google رجع نتائج ──
     if (allProducts.length > 0) {
       const unique = deduplicateProducts(allProducts);
       const sorted = wantCheaper
         ? unique.sort((a, b) => extractPrice(a.price) - extractPrice(b.price))
         : unique;
-      console.log(`Google Search: ${sorted.length} results for "${searchTerms[0]}"`);
-      return res.json({ products: sorted.slice(0, 6), mock: false, source: 'google' });
+      console.log(`🎯 إجمالي النتائج: ${sorted.length} منتج`);
+      return res.json({ products: sorted.slice(0, 8), mock: false });
     }
 
-    // ── Fallback: بيانات تجريبية لو Google فشل ──
-    console.log('Google Search failed, using mock data');
-    const mockProducts = [];
-    searchTerms.slice(0, 3).forEach((q, i) => {
-      mockProducts.push(...getMockProducts(q, market, wantCheaper, i));
-    });
+    // Fallback
+    console.log('⚠️ كل المصادر فشلت — بيانات تجريبية');
+    const mockProducts = searchTerms.slice(0, 3).flatMap((q, i) => getMockProducts(q, market, wantCheaper, i));
     const unique = deduplicateProducts(mockProducts);
     const sorted = wantCheaper
       ? unique.sort((a, b) => extractPrice(a.price) - extractPrice(b.price))
