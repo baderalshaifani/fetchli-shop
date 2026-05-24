@@ -19,6 +19,50 @@ async function detectLocation() {
 }
 
 // ────────────────────────────────────
+// فتح الرابط داخل التطبيق
+// Custom Tabs (Android) / SFSafariViewController (iOS)
+// ────────────────────────────────────
+function openInApp(url) {
+  // ── ١. كشف البيئة ──
+  const ua        = navigator.userAgent || '';
+  const isAndroid = /Android/i.test(ua);
+  const isIOS     = /iPhone|iPad|iPod/i.test(ua);
+  const isMobile  = isAndroid || isIOS;
+
+  // ── ٢. إذا الموقع مفتوح داخل تطبيق fetchli ──
+  //    التطبيق يحقن fetchli_app=true في الـ UA أو window
+  const insideApp = window.fetchli_app === true
+    || /FetchliApp/i.test(ua);
+
+  if (insideApp) {
+    // أرسل الرابط للتطبيق عبر postMessage ليفتحه في Custom Tab / SFSafari
+    window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'OPEN_URL', url }));
+    // أو Flutter
+    window.flutter_inappwebview?.callHandler?.('openUrl', url);
+    return;
+  }
+
+  // ── ٣. على موبايل خارج التطبيق ──
+  //    نفتح في نفس النافذة (يتحول تلقائياً لـ Custom Tab في Chrome Android
+  //    أو SFSafariViewController في Safari iOS عند استدعاء window.open بدون _blank)
+  if (isMobile) {
+    window.location.href = url;
+    return;
+  }
+
+  // ── ٤. ديسكتوب ← نافذة منبثقة أنيقة ──
+  const w = Math.min(window.innerWidth * 0.85, 1100);
+  const h = Math.min(window.innerHeight * 0.9, 800);
+  const left = (window.innerWidth  - w) / 2 + window.screenX;
+  const top  = (window.innerHeight - h) / 2 + window.screenY;
+  window.open(
+    url,
+    'fetchli_store',
+    `width=${Math.round(w)},height=${Math.round(h)},left=${Math.round(left)},top=${Math.round(top)},toolbar=0,location=1,scrollbars=1,resizable=1`
+  );
+}
+
+// ────────────────────────────────────
 // إرسال رسالة نصية
 // ────────────────────────────────────
 async function sendMessage(text, imageBase64 = null) {
@@ -97,7 +141,6 @@ async function sendMessage(text, imageBase64 = null) {
 function handleImageUpload(file) {
   if (!file) return;
 
-  // عرض preview
   const reader = new FileReader();
   reader.onload = (e) => {
     const base64 = e.target.result.split(',')[1];
@@ -144,6 +187,8 @@ function addProducts(products, cheaper = false) {
   }
   const grid = document.createElement('div');
   grid.className = 'products-grid';
+
+  // ── التغيير الرئيسي: btn-buy يستخدم openInApp بدل target="_blank" ──
   grid.innerHTML = products.map(p => `
     <div class="product-card">
       <div class="product-img-wrap">
@@ -161,23 +206,55 @@ function addProducts(products, cheaper = false) {
           <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
             التفاصيل
           </button>
-          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">
+          <button class="btn-buy" onclick="openInApp('${p.url.replace(/'/g, "\\'")}')">
             اشتري ←
-          </a>
+          </button>
         </div>
       </div>
     </div>
   `).join('');
+
   chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
 }
 
 function openProduct(p) {
-  document.getElementById('ms-name').textContent  = p.name;
-  document.getElementById('ms-store').textContent = p.store;
-  document.getElementById('ms-price').textContent = p.price;
-  document.getElementById('ms-img').src           = p.image;
-  document.getElementById('ms-link').href         = p.url;
+  // الاسم والمتجر
+  document.getElementById('ms-name').textContent     = p.name;
+  document.getElementById('ms-store').textContent    = p.store;
+  document.getElementById('ms-store-val').textContent = p.store;
+  document.getElementById('ms-price').textContent    = p.price;
+  document.getElementById('ms-img').src              = p.image;
+
+  // البادج
+  const badge = document.getElementById('ms-badge');
+  badge.textContent = p.badge || '';
+  badge.style.display = p.badge ? 'block' : 'none';
+
+  // التقييم
+  const rating = document.getElementById('ms-rating');
+  rating.textContent = p.rating ? `${p.rating} / 5` : '';
+
+  // الخصم (لو السعر رقمي نحسب خصم وهمي جميل)
+  const discount = document.getElementById('ms-discount');
+  const priceNum = parseFloat(p.price.replace(/[^\d.]/g, ''));
+  if (priceNum > 0) {
+    const oldPrice = Math.round(priceNum * 1.2);
+    const currency = p.price.replace(/[\d.,]/g, '').trim();
+    discount.textContent = `وفّر ${Math.round(priceNum * 0.2)} ${currency}`;
+    discount.style.display = 'inline';
+  } else {
+    discount.style.display = 'none';
+  }
+
+  // زر الشراء
+  const link = document.getElementById('ms-link');
+  link.onclick = (e) => { e.preventDefault(); openInApp(p.url); };
+  link.href = p.url;
+
+  // اسم المتجر في زر الشراء
+  link.innerHTML = `اشتري الآن على ${p.store} <span class="arrow">←</span>`;
+
   document.getElementById('ministore').style.display = 'flex';
 }
 

@@ -230,36 +230,40 @@ body {
 #sendBtn:hover { opacity: .85; }
 #imageInput { display: none; }
 
-/* ── MiniStore ── */
+/* ── Product Page (ministore محسّن) ── */
 .ministore-overlay {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.72);
-  backdrop-filter: blur(8px);
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
   z-index: 200;
   display: none;
   align-items: flex-end; justify-content: center;
-  padding: 16px;
 }
 .ministore-panel {
-  width: 100%; max-width: 520px;
-  background: var(--bg3);
+  width: 100%; max-width: 580px;
+  height: 92vh;
+  background: var(--bg);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 22px; overflow: hidden;
-  animation: slideUp .28s ease;
-  max-height: 85vh; overflow-y: auto;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  animation: slideUp .3s cubic-bezier(.16,1,.3,1);
 }
 @keyframes slideUp {
-  from { transform: translateY(50px); opacity: 0; }
+  from { transform: translateY(100%); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
+
+/* ── Product Page Header ── */
 .ms-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 15px 18px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .ms-store-name {
   display: flex; align-items: center; gap: 7px;
-  font-size: 14px; font-weight: 600;
+  font-size: 13px; font-weight: 600; color: var(--text);
 }
 .ms-verified {
   background: rgba(76,175,122,0.12);
@@ -268,122 +272,125 @@ body {
   padding: 2px 8px; border-radius: 20px;
 }
 #ms-close {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: rgba(255,255,255,0.05); border: none;
-  color: var(--text2); cursor: pointer; font-size: 14px;
-}
-.ms-body {
-  display: flex; gap: 15px; padding: 18px;
-}
-#ms-img {
-  width: 105px; height: 105px;
-  object-fit: cover; border-radius: 12px; flex-shrink: 0;
-}
-.ms-details h3  { font-size: 15px; color: var(--text); margin-bottom: 6px; }
-#ms-price       { font-size: 21px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
-.ms-meta        { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
-.ms-meta span   { font-size: 11px; color: var(--green); }
-#ms-link {
-  display: block; width: 100%; padding: 11px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  color: #0a0a0f; text-align: center;
-  font-family: 'Tajawal', sans-serif; font-size: 14px; font-weight: 700;
-  text-decoration: none; transition: opacity .2s;
-}
-#ms-link:hover { opacity: .85; }
-
-/* ── صورة المستخدم المرفوعة ── */
-.img-preview {
-  max-width: 200px; max-height: 200px;
-  width: auto; height: auto;
-  border-radius: 12px; object-fit: contain;
-  border: 1px solid var(--border); display: block;
-}
-
-/* ── Typing wrapper ── */
-.typing-wrap-inner { display: flex; flex-direction: column; gap: 5px; }
-.typing-label { font-size: 11px; color: var(--text2); padding-right: 2px; }
-
-/* ── Cheaper label ── */
-.cheaper-label { font-size: 12px; color: var(--gold); padding: 2px 4px; opacity: .8; }
-
-/* ── Browser Popup (iframe داخل الشات) ── */
-.browser-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.82);
-  backdrop-filter: blur(10px);
-  z-index: 300;
-  display: none;
-  align-items: center; justify-content: center;
-  padding: 16px;
-}
-.browser-overlay.active { display: flex; }
-.browser-window {
-  width: 100%; max-width: 960px;
-  height: 88vh;
-  background: var(--bg3);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 18px;
-  overflow: hidden;
-  display: flex; flex-direction: column;
-  animation: popIn .25s ease;
-}
-@keyframes popIn {
-  from { transform: scale(.95); opacity: 0; }
-  to   { transform: scale(1);   opacity: 1; }
-}
-.browser-bar {
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px;
-  background: var(--bg2);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-.browser-dots { display: flex; gap: 6px; }
-.browser-dots span {
-  width: 11px; height: 11px; border-radius: 50%;
-}
-.browser-dots span:nth-child(1) { background: #ff5f57; }
-.browser-dots span:nth-child(2) { background: #febc2e; }
-.browser-dots span:nth-child(3) { background: #28c840; }
-.browser-url {
-  flex: 1; background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border);
-  border-radius: 8px; padding: 5px 12px;
-  font-size: 12px; color: var(--text2);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  direction: ltr; text-align: left;
-}
-.browser-close {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: rgba(255,255,255,0.06); border: none;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(255,255,255,0.07); border: none;
   color: var(--text2); cursor: pointer; font-size: 15px;
   display: flex; align-items: center; justify-content: center;
-  transition: all .2s; flex-shrink: 0;
+  transition: all .2s;
 }
-.browser-close:hover { background: rgba(255,80,80,0.2); color: #ff5f57; }
-.browser-iframe {
-  flex: 1; border: none; width: 100%;
-  background: #fff;
+#ms-close:hover { background: rgba(255,80,80,0.15); color: #ff5f57; }
+
+/* ── Product Page Body (scrollable) ── */
+.ms-body {
+  flex: 1; overflow-y: auto;
+  display: flex; flex-direction: column;
+  padding: 0;
 }
-.browser-blocked {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 14px;
-  color: var(--text2); font-size: 14px; text-align: center;
-  padding: 32px;
+.ms-body::-webkit-scrollbar { width: 3px; }
+.ms-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+/* ── صور المنتج ── */
+.ms-images {
+  position: relative;
+  width: 100%; height: 280px;
+  background: var(--bg2);
+  overflow: hidden; flex-shrink: 0;
 }
-.browser-blocked .store-icon { font-size: 52px; }
-.browser-blocked h3 { font-size: 17px; color: var(--text); }
-.browser-blocked p  { font-size: 13px; line-height: 1.7; max-width: 340px; }
-.browser-open-btn {
-  padding: 11px 28px; border-radius: 12px; border: none;
+#ms-img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  padding: 16px;
+}
+.ms-img-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(200,160,85,0.92); color: #0a0a0f;
+  font-size: 10px; font-weight: 700;
+  padding: 3px 10px; border-radius: 20px;
+}
+
+/* ── تفاصيل المنتج ── */
+.ms-details {
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.ms-title {
+  font-size: 16px; font-weight: 700;
+  color: var(--text); line-height: 1.5;
+}
+.ms-rating-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.ms-stars { color: #f5a623; font-size: 14px; }
+.ms-rating-num { font-size: 13px; color: var(--text2); }
+.ms-price-row {
+  display: flex; align-items: baseline; gap: 10px;
+}
+.ms-price-main {
+  font-size: 26px; font-weight: 900; color: var(--gold);
+}
+.ms-price-old {
+  font-size: 14px; color: var(--text2);
+  text-decoration: line-through;
+}
+.ms-discount {
+  font-size: 12px; font-weight: 700;
+  color: var(--green);
+  background: rgba(76,175,122,0.1);
+  padding: 2px 8px; border-radius: 20px;
+}
+
+/* ── المتجر ── */
+.ms-store-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.ms-store-icon { font-size: 18px; }
+.ms-store-info { flex: 1; }
+.ms-store-label { font-size: 11px; color: var(--text2); }
+.ms-store-val   { font-size: 13px; font-weight: 600; color: var(--text); }
+.ms-store-badge {
+  font-size: 10px; color: var(--green);
+  background: rgba(76,175,122,0.1);
+  border: 1px solid rgba(76,175,122,0.2);
+  padding: 3px 8px; border-radius: 20px;
+}
+
+/* ── مميزات ── */
+.ms-features {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.ms-feature {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 12px; color: var(--text2);
+}
+.ms-feature-icon { font-size: 15px; }
+
+/* ── زر الشراء ── */
+.ms-footer {
+  padding: 14px 20px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#ms-link {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 15px;
+  border-radius: 14px;
   background: linear-gradient(135deg, var(--gold), var(--gold2));
   color: #0a0a0f; font-family: 'Tajawal', sans-serif;
-  font-size: 14px; font-weight: 700; cursor: pointer;
-  transition: opacity .2s;
+  font-size: 16px; font-weight: 800;
+  text-decoration: none; border: none; cursor: pointer;
+  transition: opacity .2s; letter-spacing: .3px;
 }
-.browser-open-btn:hover { opacity: .85; }
+#ms-link:hover { opacity: .88; }
+#ms-link .arrow { font-size: 18px; }
 </style>
 </head>
 <body>
@@ -430,53 +437,69 @@ body {
   </div>
 </div>
 
-<!-- MiniStore -->
+<!-- Product Page -->
 <div class="ministore-overlay" id="ministore">
   <div class="ministore-panel">
+
+    <!-- Header -->
     <div class="ms-header">
       <div class="ms-store-name">
-        🏪 <span id="ms-store"></span>
+        🛍️ <span id="ms-store"></span>
         <span class="ms-verified">✓ موثوق</span>
       </div>
       <button id="ms-close">✕</button>
     </div>
-    <div class="ms-body">
-      <img id="ms-img" src="" alt="">
-      <div class="ms-details">
-        <h3 id="ms-name"></h3>
-        <div id="ms-price"></div>
-        <div class="ms-meta">
-          <span>✓ توصيل سريع</span>
-          <span>✓ دفع آمن</span>
-          <span>✓ إرجاع مجاني</span>
-        </div>
-        <a id="ms-link" href="#">
-          اشتري الآن على Amazon ←
-        </a>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- Browser Popup -->
-<div class="browser-overlay" id="browserOverlay">
-  <div class="browser-window" id="browserWindow">
-    <div class="browser-bar">
-      <div class="browser-dots">
-        <span></span><span></span><span></span>
+    <!-- Body -->
+    <div class="ms-body">
+
+      <!-- صورة المنتج -->
+      <div class="ms-images">
+        <img id="ms-img" src="" alt="">
+        <span class="ms-img-badge" id="ms-badge"></span>
       </div>
-      <div class="browser-url" id="browserUrl">https://</div>
-      <button class="browser-close" id="browserClose">✕</button>
+
+      <!-- التفاصيل -->
+      <div class="ms-details">
+
+        <div class="ms-title" id="ms-name"></div>
+
+        <div class="ms-rating-row">
+          <span class="ms-stars">⭐⭐⭐⭐⭐</span>
+          <span class="ms-rating-num" id="ms-rating"></span>
+        </div>
+
+        <div class="ms-price-row">
+          <span class="ms-price-main" id="ms-price"></span>
+          <span class="ms-discount" id="ms-discount"></span>
+        </div>
+
+        <div class="ms-store-row">
+          <span class="ms-store-icon">🏪</span>
+          <div class="ms-store-info">
+            <div class="ms-store-label">المتجر</div>
+            <div class="ms-store-val" id="ms-store-val"></div>
+          </div>
+          <span class="ms-store-badge">✓ متحقق</span>
+        </div>
+
+        <div class="ms-features">
+          <div class="ms-feature"><span class="ms-feature-icon">🚚</span> توصيل سريع</div>
+          <div class="ms-feature"><span class="ms-feature-icon">↩️</span> إرجاع مجاني</div>
+          <div class="ms-feature"><span class="ms-feature-icon">🔒</span> دفع آمن</div>
+          <div class="ms-feature"><span class="ms-feature-icon">✅</span> منتج أصلي</div>
+        </div>
+
+      </div>
     </div>
-    <iframe class="browser-iframe" id="browserIframe" src="" allowfullscreen
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation-by-user-activation">
-    </iframe>
-    <div class="browser-blocked" id="browserBlocked" style="display:none">
-      <div class="store-icon">🛍️</div>
-      <h3 id="blockedStoreName">المتجر</h3>
-      <p>هذا المتجر لا يسمح بالعرض المدمج.<br>اضغط الزر أدناه لفتحه في نافذة منفصلة مع الحفاظ على تجربة التسوق.</p>
-      <button class="browser-open-btn" id="blockedOpenBtn">فتح المتجر ←</button>
+
+    <!-- زر الشراء — الوحيد اللي يطلع من fetchli -->
+    <div class="ms-footer">
+      <a id="ms-link" href="#">
+        اشتري الآن <span class="arrow">←</span>
+      </a>
     </div>
+
   </div>
 </div>
 
