@@ -141,13 +141,30 @@ async function analyzeWithClaude(message, imageBase64, visionData, wantCheaper) 
 
   content.push({
     type: 'text',
-    text: `You are a professional shopping expert.
-${imageBase64 ? 'IMPORTANT: Analyze the image carefully. Identify EXACTLY what product is shown.' : ''}
+    
+    text: `You are a world-class Amazon product search specialist with expert knowledge of product models, SKUs, and specifications.
+
+${imageBase64 ? `CRITICAL IMAGE ANALYSIS INSTRUCTIONS:
+1. Read ANY visible text, numbers, logos, or model codes on the product
+2. Identify the EXACT model name/number (e.g. "Submariner 116610LN" not just "Rolex watch")
+3. Note precise color names (e.g. "rhodium dial" not just "silver")
+4. Identify exact material (e.g. "904L stainless steel" not just "metal")
+5. Spot any unique design details (bezel type, strap pattern, clasp style)` : ''}
+
 ${visionContext}
 ${message ? `User request: "${message}"` : ''}
 ${cheaperNote}
 
-Create 5 different English search queries for Amazon search.
+SEARCH QUERY RULES — each query must be highly specific for Amazon:
+- Query 1: Brand + EXACT model number/name + color + material (most specific)
+- Query 2: Brand + product type + key visual features (no generic words)
+- Query 3: ${wantCheaper ? 'dupe alternative similar budget + product type' : 'product type + all distinctive details'}
+- Query 4: ${wantCheaper ? 'affordable similar style cheap version' : 'exact model or close variant'}
+- Query 5: Broader fallback with brand + category only
+
+BAD query example: "rolex watch silver"
+GOOD query example: "Rolex Submariner 116610LN 40mm black ceramic bezel stainless steel"
+
 Respond ONLY with valid JSON:
 {
   "productType": "نوع المنتج بالعربي",
