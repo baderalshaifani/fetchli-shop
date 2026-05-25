@@ -149,6 +149,19 @@ body {
   font-size: 10px; font-weight: 700;
   padding: 2px 8px; border-radius: 20px;
 }
+
+/* ── pill نسبة التطابق على الصورة ── */
+.match-score-pill {
+  position: absolute;
+  bottom: 8px; right: 8px;
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
 .product-body   { padding: 10px; }
 .product-name   { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; line-height: 1.4; }
 .product-store  { font-size: 11px; color: var(--text2); display: flex; align-items: center; gap: 5px; margin-bottom: 6px; }
@@ -156,24 +169,22 @@ body {
 .rating         { margin-right: auto; font-size: 10px; color: var(--gold); }
 .product-price  { font-size: 15px; font-weight: 700; color: var(--gold); margin-bottom: 9px; }
 .product-actions { display: flex; gap: 6px; }
+
+/* ── زر التفاصيل — يأخذ العرض كاملاً ── */
 .btn-details {
-  flex: 1; padding: 6px; border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent; color: var(--text2);
-  font-family: 'Tajawal', sans-serif; font-size: 11px; cursor: pointer;
-  transition: all .2s;
+  flex: 1; padding: 9px 6px; border-radius: 10px;
+  border: 1px solid rgba(200,160,85,0.35);
+  background: rgba(200,160,85,0.07);
+  color: var(--gold);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+  width: 100%; text-align: center;
 }
-.btn-details:hover { background: rgba(255,255,255,0.05); color: var(--text); }
-.btn-buy {
-  flex: 1; padding: 6px; border-radius: 8px; border: none;
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  color: #0a0a0f;
-  font-family: 'Tajawal', sans-serif; font-size: 11px; font-weight: 700;
-  cursor: pointer; text-decoration: none;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity .2s;
+.btn-details:hover {
+  background: rgba(200,160,85,0.15);
+  transform: translateY(-1px);
 }
-.btn-buy:hover { opacity: .85; }
 
 /* ── Suggestions ── */
 .chips {
@@ -245,7 +256,7 @@ body {
 /* ── Cheaper label ── */
 .cheaper-label { font-size: 12px; color: var(--gold); padding: 2px 4px; opacity: .8; }
 
-/* ── Product Page (ministore محسّن) ── */
+/* ── Product Page (ministore) ── */
 .ministore-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.85);
@@ -393,6 +404,46 @@ body {
   padding: 2px 8px; border-radius: 20px;
 }
 
+/* ── مؤشر نسبة المطابقة ── */
+.ms-match-bar-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+}
+.ms-match-label {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.ms-match-score-num {
+  font-size: 1.15rem; font-weight: 800;
+}
+.ms-match-text {
+  font-size: 0.8rem; color: var(--text2);
+  margin-right: auto;
+}
+.ms-match-bar-bg {
+  width: 100%; height: 6px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px; overflow: hidden;
+}
+.ms-match-bar-fill {
+  height: 100%; border-radius: 10px;
+  transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+/* ── بيانات إضافية: ماركة، لون، خامة… ── */
+#ms-meta { display: flex; flex-direction: column; }
+.ms-meta-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 13px;
+}
+.ms-meta-row:last-child { border-bottom: none; }
+.ms-meta-key { color: var(--text2); font-weight: 500; }
+.ms-meta-val { font-weight: 600; color: var(--text); }
+
 /* ── المتجر ── */
 .ms-store-row {
   display: flex; align-items: center; gap: 8px;
@@ -433,18 +484,38 @@ body {
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+
+/* حالات الزر حسب نسبة المطابقة */
 #ms-link {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; padding: 15px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--gold), var(--gold2));
-  color: #0a0a0f; font-family: 'Tajawal', sans-serif;
+  font-family: 'Tajawal', sans-serif;
   font-size: 16px; font-weight: 800;
   text-decoration: none; border: none; cursor: pointer;
-  transition: opacity .2s; letter-spacing: .3px;
+  transition: opacity .2s, transform .2s;
+  letter-spacing: .3px;
 }
-#ms-link:hover { opacity: .88; }
-#ms-link .arrow { font-size: 18px; }
+#ms-link:hover { opacity: .88; transform: translateY(-1px); }
+
+/* 92%+ أخضر */
+#ms-link.buy-high {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  box-shadow: 0 4px 20px rgba(34,197,94,0.3);
+}
+/* 80–91% ذهبي */
+#ms-link.buy-mid {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #0a0a0f;
+  box-shadow: 0 4px 20px rgba(200,160,85,0.3);
+}
+/* أقل من 80% رمادي محايد */
+#ms-link.buy-low {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.15);
+}
 </style>
 </head>
 <body>
@@ -491,7 +562,7 @@ body {
   </div>
 </div>
 
-<!-- Product Page -->
+<!-- Product Details Modal -->
 <div class="ministore-overlay" id="ministore">
   <div class="ministore-panel">
 
@@ -507,7 +578,7 @@ body {
     <!-- Body -->
     <div class="ms-body">
 
-      <!-- صور المنتج — slider -->
+      <!-- صورة المنتج -->
       <div class="ms-images" id="msImages">
         <div class="ms-imgs-track" id="msImgsTrack">
           <div class="ms-img-slide">
@@ -535,6 +606,12 @@ body {
           <span class="ms-discount" id="ms-discount"></span>
         </div>
 
+        <!-- ✦ مؤشر نسبة المطابقة -->
+        <div id="ms-match"></div>
+
+        <!-- ✦ بيانات المنتج: ماركة، لون، خامة، مميزات -->
+        <div id="ms-meta"></div>
+
         <div class="ms-store-row">
           <span class="ms-store-icon">🏪</span>
           <div class="ms-store-info">
@@ -554,15 +631,16 @@ body {
       </div>
     </div>
 
-    <!-- زر الشراء — الوحيد اللي يطلع من fetchli -->
+    <!-- ✦ زر الشراء — يُعبّأ ديناميكياً حسب نسبة المطابقة -->
     <div class="ms-footer">
-      <a id="ms-link" href="#">
-        اشتري الآن <span class="arrow">←</span>
+      <a id="ms-link" href="#" target="_blank" rel="noopener" class="buy-high">
+        اشتري الآن ←
       </a>
     </div>
 
   </div>
 </div>
+
 <script src="app.js"></script>
 </body>
 </html>
