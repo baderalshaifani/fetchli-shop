@@ -56,7 +56,12 @@ async function sendMessage(text, imageBase64 = null) {
         wantCheaper,
       }),
     });
-    const { products, mock } = await searchRes.json();
+    const { products, mock, error } = await searchRes.json();
+if (error && !products?.length) {
+  removeTyping();
+  addMessage('ai', error);
+  return;
+}
 
     // ── المرحلة ٣: تصفية بـ Claude للدقة العالية ──
     let finalProducts = products;
