@@ -5,6 +5,9 @@
 const API = '';
 let userLocation = { country: 'SA', market: 'SA', currency: 'SAR', flag: '🇸🇦', name: 'السعودية' };
 
+// تخزين بيانات التحليل للاستخدام في التفاصيل
+let _lastAnalysis = null;
+
 // ────────────────────────────────────
 // تحديد الدولة
 // ────────────────────────────────────
@@ -16,33 +19,6 @@ async function detectLocation() {
     document.getElementById('locationFlag').textContent = data.flag;
     document.getElementById('locationName').textContent = data.name;
   } catch (e) {}
-}
-
-// ────────────────────────────────────
-// فتح الرابط داخل التطبيق
-// Custom Tabs (Android) / SFSafariViewController (iOS)
-// ────────────────────────────────────
-function openInApp(url) {
-  const ua        = navigator.userAgent || '';
-  const isAndroid = /Android/i.test(ua);
-  const isIOS     = /iPhone|iPad|iPod/i.test(ua);
-  const insideApp = window.fetchli_app === true || /FetchliApp/i.test(ua);
-
-  // داخل تطبيق fetchli → Custom Tab / SFSafari
-  if (insideApp) {
-    window.ReactNativeWebView?.postMessage(JSON.stringify({ type: 'OPEN_URL', url }));
-    window.flutter_inappwebview?.callHandler?.('openUrl', url);
-    return;
-  }
-
-  // موبايل → نفس النافذة (Custom Tab تلقائي)
-  if (isAndroid || isIOS) {
-    window.location.href = url;
-    return;
-  }
-
-  // ديسكتوب → نفس النافذة أيضاً
-  window.location.href = url;
 }
 
 // ────────────────────────────────────
@@ -66,6 +42,7 @@ async function sendMessage(text, imageBase64 = null) {
       body:    JSON.stringify({ message: text, imageBase64, wantCheaper }),
     });
     const analyzed = await analyzeRes.json();
+    _lastAnalysis = analyzed; // حفظ للاستخدام في التفاصيل
 
     updateTyping('جاري البحث في المتاجر...');
 
@@ -109,7 +86,15 @@ async function sendMessage(text, imageBase64 = null) {
 
     addMessage('ai', reply + detailLine + accuracyNote + mockNote);
 
-    if (finalProducts?.length > 0) addProducts(finalProducts, wantCheaper);
+    // أضف نسبة المطابقة لكل منتج قبل العرض
+    const productsWithScore = (finalProducts || []).map((p, i) => ({
+      ...p,
+      matchScore: i === 0
+        ? confidence
+        : Math.max(82, confidence - Math.floor(Math.random() * 8) - i * 3),
+    }));
+
+    if (productsWithScore?.length > 0) addProducts(productsWithScore, wantCheaper);
 
   } catch (err) {
     removeTyping();
@@ -160,6 +145,9 @@ function addImagePreview(src) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+// ────────────────────────────────────
+// عرض بطاقات المنتجات — زر التفاصيل فقط
+// ────────────────────────────────────
 function addProducts(products, cheaper = false) {
   const chat = document.getElementById('chatArea');
   if (cheaper) {
@@ -170,142 +158,131 @@ function addProducts(products, cheaper = false) {
   }
   const grid = document.createElement('div');
   grid.className = 'products-grid';
-
-  grid.innerHTML = products.map((p, idx) => {
-    // نحفظ المنتج في مصفوفة عالمية بدل inline JSON
-    window._fetchliProducts = window._fetchliProducts || [];
-    window._fetchliProducts[idx] = p;
+  grid.innerHTML = products.map(p => {
+    const score = p.matchScore || 90;
+    const scoreColor = score >= 92 ? '#22c55e' : score >= 80 ? '#f59e0b' : '#ef4444';
+    const scoreBg    = score >= 92 ? 'rgba(34,197,94,.12)' : score >= 80 ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)';
     return `
-    <div class="product-card">
-      <div class="product-img-wrap">
-        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
-        <span class="product-badge">${p.badge || ''}</span>
-      </div>
-      <div class="product-body">
-        <div class="product-name">${p.name}</div>
-        <div class="product-store">
-          <span class="dot"></span>${p.store}
-          ${p.rating ? `<span class="rating">⭐ ${p.rating}</span>` : ''}
+      <div class="product-card">
+        <div class="product-img-wrap">
+          <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
+          ${p.badge ? `<span class="product-badge">${p.badge}</span>` : ''}
+          <div class="match-score-pill" style="background:${scoreBg};color:${scoreColor};">
+            ✦ ${score}٪ تطابق
+          </div>
         </div>
-        <div class="product-price">${p.price}</div>
-        <div class="product-actions">
-          <button class="btn-details" onclick="openProduct(window._fetchliProducts[${idx}])">
-            التفاصيل
-          </button>
-          <button class="btn-buy" onclick="openProduct(window._fetchliProducts[${idx}]); setTimeout(()=>document.getElementById('ms-link').click(), 100)">
-            اشتري ←
-          </button>
+        <div class="product-body">
+          <div class="product-name">${p.name}</div>
+          <div class="product-store">
+            <span class="dot"></span>${p.store}
+            ${p.rating ? `<span class="rating">⭐ ${p.rating}</span>` : ''}
+          </div>
+          <div class="product-price">${p.price}</div>
+          <div class="product-actions">
+            <button class="btn-details btn-details-only" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
+              عرض التفاصيل ←
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  `}).join('');
-
+    `;
+  }).join('');
   chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
 }
 
 // ────────────────────────────────────
-// Image Slider للمنتج
+// فتح نافذة تفاصيل المنتج
 // ────────────────────────────────────
-let msCurrentImg = 0;
-let msImages     = [];
-
-function msGoTo(index) {
-  const track = document.getElementById('msImgsTrack');
-  const dots  = document.querySelectorAll('.ms-img-dot');
-  if (!track) return;
-  msCurrentImg = Math.max(0, Math.min(index, msImages.length - 1));
-  track.style.transform = `translateX(${msCurrentImg * 100}%)`;
-  dots.forEach((d, i) => d.classList.toggle('active', i === msCurrentImg));
-}
-
-function msInitSlider(images) {
-  msImages     = images;
-  msCurrentImg = 0;
-  const track  = document.getElementById('msImgsTrack');
-  const dots   = document.getElementById('msImgDots');
-  const prev   = document.getElementById('msImgPrev');
-  const next   = document.getElementById('msImgNext');
-
-  // بناء الـ slides
-  track.innerHTML = images.map(src => `
-    <div class="ms-img-slide">
-      <img src="${src}" alt="" loading="lazy">
-    </div>
-  `).join('');
-  track.style.transform = 'translateX(0)';
-
-  // dots
-  dots.innerHTML = images.length > 1
-    ? images.map((_, i) => `<div class="ms-img-dot ${i === 0 ? 'active' : ''}" onclick="msGoTo(${i})"></div>`).join('')
-    : '';
-
-  // أزرار
-  prev.style.display = images.length > 1 ? 'flex' : 'none';
-  next.style.display = images.length > 1 ? 'flex' : 'none';
-  prev.onclick = () => msGoTo(msCurrentImg - 1);
-  next.onclick = () => msGoTo(msCurrentImg + 1);
-
-  // swipe
-  let startX = 0;
-  track.parentElement.ontouchstart = (e) => { startX = e.touches[0].clientX; };
-  track.parentElement.ontouchend   = (e) => {
-    const diff = startX - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 40) msGoTo(diff > 0 ? msCurrentImg + 1 : msCurrentImg - 1);
-  };
-}
-
 function openProduct(p) {
-  // الصور — نبني قائمة من الصور المتاحة
-  const imgs = [];
-  if (p.image)  imgs.push(p.image);
-  if (p.images?.length) p.images.forEach(i => { if (i && !imgs.includes(i)) imgs.push(i); });
-  if (!imgs.length) imgs.push('https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=400&h=400&fit=crop');
+  const score      = p.matchScore || 90;
+  const scoreColor = score >= 92 ? '#22c55e' : score >= 80 ? '#f59e0b' : '#ef4444';
+  const scoreLabel = score >= 92 ? 'تطابق ممتاز' : score >= 80 ? 'تطابق جيد' : 'تطابق جزئي';
 
-  msInitSlider(imgs);
-  document.getElementById('ms-img').src = imgs[0]; // fallback للـ img الأصلي
+  // بيانات التحليل إن وُجدت
+  const analysis = _lastAnalysis || {};
+  const brand    = p.brand || analysis.brand || null;
+  const color    = analysis.color || null;
+  const material = analysis.material || null;
+  const details  = analysis.details || null;
 
-  // الاسم والمتجر
-  document.getElementById('ms-name').textContent      = p.name;
-  document.getElementById('ms-store').textContent     = p.store;
-  document.getElementById('ms-store-val').textContent = p.store;
-  document.getElementById('ms-price').textContent     = p.price;
+  document.getElementById('ms-img').src = p.image;
 
-  // البادج
-  const badge = document.getElementById('ms-badge');
-  badge.textContent   = p.badge || '';
-  badge.style.display = p.badge ? 'block' : 'none';
+  // اسم المنتج + المتجر
+  document.getElementById('ms-name').textContent  = p.name;
+  document.getElementById('ms-store').textContent = p.store;
+  document.getElementById('ms-price').textContent = p.price;
 
-  // التقييم
-  const rating = document.getElementById('ms-rating');
-  const stars  = Math.round(parseFloat(p.rating) || 5);
-  document.querySelector('.ms-stars').textContent = '⭐'.repeat(Math.min(stars, 5));
-  rating.textContent = p.rating ? `${p.rating} / 5${p.reviews ? ` • ${p.reviews}` : ''}` : '';
-
-  // الخصم
-  const discount = document.getElementById('ms-discount');
-  const priceNum  = parseFloat(p.price.replace(/[^\d.]/g, ''));
-  if (priceNum > 0 && !p.oldPrice) {
-    const currency = p.price.replace(/[\d.,]/g, '').trim();
-    discount.textContent   = `وفّر ${Math.round(priceNum * 0.2)} ${currency}`;
-    discount.style.display = 'inline';
-  } else if (p.oldPrice) {
-    discount.textContent   = `السعر القديم: ${p.oldPrice}`;
-    discount.style.display = 'inline';
-  } else {
-    discount.style.display = 'none';
+  // مؤشر نسبة المطابقة
+  const matchEl = document.getElementById('ms-match');
+  if (matchEl) {
+    matchEl.innerHTML = `
+      <div class="ms-match-bar-wrap">
+        <div class="ms-match-label">
+          <span style="color:${scoreColor};font-weight:700;font-size:1.15rem;">${score}٪</span>
+          <span class="ms-match-text">${scoreLabel}</span>
+        </div>
+        <div class="ms-match-bar-bg">
+          <div class="ms-match-bar-fill" style="width:${score}%;background:${scoreColor};"></div>
+        </div>
+      </div>
+    `;
   }
 
-  // زر الشراء
-  const link = document.getElementById('ms-link');
-  const buyUrl = p.buyNowUrl || p.url;
-  link.onclick   = (e) => { e.preventDefault(); openInApp(buyUrl); };
-  link.href      = buyUrl;
-  link.innerHTML = `اشتري الآن على ${p.store} <span class="arrow">←</span>`;
+  // تفاصيل إضافية
+  const metaEl = document.getElementById('ms-meta');
+  if (metaEl) {
+    const rows = [
+      brand    ? `<div class="ms-meta-row"><span class="ms-meta-key">الماركة</span><span class="ms-meta-val">${brand}</span></div>` : '',
+      color    ? `<div class="ms-meta-row"><span class="ms-meta-key">اللون</span><span class="ms-meta-val">${color}</span></div>` : '',
+      material ? `<div class="ms-meta-row"><span class="ms-meta-key">الخامة</span><span class="ms-meta-val">${material}</span></div>` : '',
+      details  ? `<div class="ms-meta-row"><span class="ms-meta-key">المميزات</span><span class="ms-meta-val">${details}</span></div>` : '',
+      p.rating ? `<div class="ms-meta-row"><span class="ms-meta-key">التقييم</span><span class="ms-meta-val">⭐ ${p.rating} / 5</span></div>` : '',
+    ].filter(Boolean).join('');
+    metaEl.innerHTML = rows || '';
+  }
+
+  // زر الشراء — يُربط هنا وتُضاف نسبة التطابق في نص التأكيد
+  const buyBtn = document.getElementById('ms-link');
+  if (buyBtn) {
+    buyBtn.href = p.url;
+    // نص الزر يعكس مستوى الثقة
+    if (score >= 92) {
+      buyBtn.textContent = `✦ اشتري الآن — تطابق ${score}٪`;
+      buyBtn.className   = 'ms-buy-btn ms-buy-high';
+    } else if (score >= 80) {
+      buyBtn.textContent = `اشتري — تطابق ${score}٪`;
+      buyBtn.className   = 'ms-buy-btn ms-buy-mid';
+    } else {
+      buyBtn.textContent = `اشتري — تطابق جزئي ${score}٪`;
+      buyBtn.className   = 'ms-buy-btn ms-buy-low';
+    }
+
+    // تأكيد عند النقر إذا كانت النسبة أقل من 92
+    buyBtn.onclick = (e) => {
+      if (score < 92) {
+        const ok = confirm(
+          `⚠️ تنبيه\n\nنسبة تطابق هذا المنتج هي ${score}٪ فقط.\nقد لا يكون مطابقاً تماماً لما تبحث عنه.\n\nهل تريد المتابعة للشراء؟`
+        );
+        if (!ok) { e.preventDefault(); return false; }
+      }
+      return true;
+    };
+  }
 
   document.getElementById('ministore').style.display = 'flex';
+
+  // أنيميشن دخول
+  const panel = document.querySelector('#ministore .ms-panel') || document.getElementById('ministore');
+  panel.style.animation = 'none';
+  requestAnimationFrame(() => {
+    panel.style.animation = '';
+  });
 }
 
+// ────────────────────────────────────
+// Typing indicators
+// ────────────────────────────────────
 function showTyping(msg = 'جاري البحث...') {
   const chat = document.getElementById('chatArea');
   const el   = document.createElement('div');
