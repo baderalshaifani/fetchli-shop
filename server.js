@@ -1791,7 +1791,7 @@ async function renderStats() {
 function openModal(id) {
   if(id==='addSource'&&!editSrcId){
     document.getElementById('src-modal-title').textContent='إضافة مصدر جديد';
-    ['src-name','src-icon','src-url','src-limit','src-timeout','src-notes','src-app-key-env','src-app-secret-env','src-query-param','src-response-mapping','src-api-method','src-field-mapping'].forEach(f=>document.getElementById(f).value='');
+    ['src-name','src-icon','src-url','src-limit','src-timeout','src-notes'].forEach(f=>document.getElementById(f).value='');
     clearChips('src-cats-chips','src-cat-in');
     renderMarketsCheckboxes(['SA','AE']);
   }
