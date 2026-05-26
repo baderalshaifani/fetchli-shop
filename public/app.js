@@ -3,6 +3,42 @@
 // ===================================
 
 const API = '';
+
+// ── CSS للـ store sections — يُحقن مرة واحدة ──
+(function injectStoreCSS() {
+  const style = document.createElement('style');
+  style.textContent = `
+    .stores-wrapper { display: flex; flex-direction: column; gap: 20px; width: 100%; }
+
+    .store-section { width: 100%; }
+
+    .store-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 10px;
+      border-right: 3px solid rgba(255,255,255,0.15);
+    }
+    .store-header-icon { font-size: 18px; }
+    .store-header-name {
+      font-weight: 700;
+      font-size: 14px;
+      flex: 1;
+      color: #fff;
+    }
+    .store-header-count {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      background: rgba(255,255,255,0.08);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+  `;
+  document.head.appendChild(style);
+})();
 let userLocation = { country: 'SA', market: 'SA', currency: 'SAR', flag: '🇸🇦', name: 'السعودية' };
 
 // ────────────────────────────────────
@@ -136,20 +172,34 @@ function addImagePreview(src) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-function addProducts(products, cheaper = false) {
-  const chat = document.getElementById('chatArea');
-  if (cheaper) {
-    const label = document.createElement('div');
-    label.className = 'cheaper-label';
-    label.textContent = '💰 مرتبة من الأرخص للأغلى';
-    chat.appendChild(label);
+// خريطة أيقونات المتاجر
+const STORE_ICONS = {
+  amazon:     '📦',
+  aliexpress: '🛒',
+  rainforest: '📦',
+  noon:       '🌞',
+  jarir:      '📚',
+  extra:      '🔌',
+  namshi:     '👗',
+  default:    '🏪',
+};
+
+function getStoreIcon(source) {
+  if (!source) return STORE_ICONS.default;
+  const s = source.toLowerCase();
+  for (const [key, icon] of Object.entries(STORE_ICONS)) {
+    if (s.includes(key)) return icon;
   }
-  const grid = document.createElement('div');
-  grid.className = 'products-grid';
-  grid.innerHTML = products.map(p => `
+  return STORE_ICONS.default;
+}
+
+function productCardHTML(p) {
+  const safeP = JSON.stringify(p).replace(/"/g, '&quot;');
+  return `
     <div class="product-card">
       <div class="product-img-wrap">
-        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
+        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy"
+          onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'">
         <span class="product-badge">${p.badge || ''}</span>
       </div>
       <div class="product-body">
@@ -160,17 +210,64 @@ function addProducts(products, cheaper = false) {
         </div>
         <div class="product-price">${p.price}</div>
         <div class="product-actions">
-          <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
-            التفاصيل
-          </button>
-          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">
-            اشتري ←
-          </a>
+          <button class="btn-details" onclick='openProduct(${safeP})'>التفاصيل</button>
+          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">اشتري ←</a>
         </div>
       </div>
-    </div>
-  `).join('');
-  chat.appendChild(grid);
+    </div>`;
+}
+
+function addProducts(products, cheaper = false) {
+  const chat = document.getElementById('chatArea');
+
+  if (cheaper) {
+    const label = document.createElement('div');
+    label.className = 'cheaper-label';
+    label.textContent = '💰 مرتبة من الأرخص للأغلى';
+    chat.appendChild(label);
+  }
+
+  // ── تجميع المنتجات حسب المتجر ──
+  const grouped = {};
+  products.forEach(p => {
+    const key = p.source || p.store || 'other';
+    if (!grouped[key]) grouped[key] = { label: p.store, source: p.source, items: [] };
+    grouped[key].items.push(p);
+  });
+
+  const sections = Object.values(grouped);
+
+  // لو متجر واحد فقط — اعرض بدون header
+  if (sections.length === 1) {
+    const grid = document.createElement('div');
+    grid.className = 'products-grid';
+    grid.innerHTML = sections[0].items.map(productCardHTML).join('');
+    chat.appendChild(grid);
+    chat.scrollTop = chat.scrollHeight;
+    return;
+  }
+
+  // لو أكثر من متجر — اعرض كل متجر في section منفصلة
+  const wrapper = document.createElement('div');
+  wrapper.className = 'stores-wrapper';
+
+  sections.forEach(section => {
+    const icon = getStoreIcon(section.source);
+    const storeSection = document.createElement('div');
+    storeSection.className = 'store-section';
+    storeSection.innerHTML = `
+      <div class="store-header">
+        <span class="store-header-icon">${icon}</span>
+        <span class="store-header-name">${section.label}</span>
+        <span class="store-header-count">${section.items.length} منتج</span>
+      </div>
+      <div class="products-grid">
+        ${section.items.map(productCardHTML).join('')}
+      </div>`;
+    wrapper.appendChild(storeSection);
+  });
+
+  chat.appendChild(wrapper);
   chat.scrollTop = chat.scrollHeight;
 }
 
