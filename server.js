@@ -1411,49 +1411,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
       </div>
       <div class="form-group"><label class="form-label">حد يومي</label><input class="form-input" id="src-limit" type="number" placeholder="250"></div>
       <div class="form-group"><label class="form-label">Timeout (ثانية)</label><input class="form-input" id="src-timeout" type="number" placeholder="10"></div>
-      <div class="form-group form-full" style="background:rgba(124,106,247,.06);border:1px solid rgba(124,106,247,.2);border-radius:8px;padding:16px">
-        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px">🔐 إعدادات التوثيق — للمصادر الجديدة</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group">
-            <label class="form-label">نوع التوثيق (authType)</label>
-            <select class="form-select" id="src-auth-type">
-              <option value="none">بدون توثيق</option>
-              <option value="aliexpress_md5">AliExpress MD5</option>
-              <option value="bearer">Bearer Token</option>
-              <option value="api_key_query">API Key (query param)</option>
-              <option value="api_key_header">API Key (header)</option>
-              <option value="hmac_sha256">HMAC SHA256</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">اسم متغير الـ App Key في Render</label>
-            <input class="form-input" id="src-app-key-env" placeholder="ALIEXPRESS_APP_KEY">
-          </div>
-          <div class="form-group">
-            <label class="form-label">اسم متغير الـ Secret في Render</label>
-            <input class="form-input" id="src-app-secret-env" placeholder="ALIEXPRESS_APP_SECRET">
-          </div>
-          <div class="form-group">
-            <label class="form-label">اسم حقل الـ query في الـ API</label>
-            <input class="form-input" id="src-query-param" placeholder="keywords أو q أو search_term">
-          </div>
-          <div class="form-group">
-            <label class="form-label">مسار المنتجات في الرد (responseMapping)</label>
-            <input class="form-input" id="src-response-mapping" placeholder="مثال: data.items أو result.products.product">
-            <span class="form-hint">المسار داخل JSON للوصول لقائمة المنتجات</span>
-          </div>
-          <div class="form-group">
-            <label class="form-label">API Method (للـ AliExpress)</label>
-            <input class="form-input" id="src-api-method" placeholder="aliexpress.affiliate.product.query">
-          </div>
-        </div>
-        <div style="margin-top:12px">
-          <label class="form-label">تخصيص حقول المنتج (fieldMapping) — JSON</label>
-          <textarea class="form-textarea" id="src-field-mapping" style="min-height:60px;font-family:var(--mono);font-size:12px" placeholder='{"name":"product_title","price":"sale_price","image":"product_main_image_url","url":"product_detail_url"}'></textarea>
-          <span class="form-hint">اختياري — إذا أسماء الحقول مختلفة عن القياسية</span>
-        </div>
+      <div class="form-group form-full">
+        <label class="form-label">إعدادات متقدمة (JSON) — للمصادر الجديدة</label>
+        <textarea class="form-textarea" id="src-notes" style="min-height:100px;font-family:var(--mono);font-size:12px" placeholder='اتركه فارغاً للمصادر المعروفة (Google/Amazon/AliExpress)
+للمصادر الجديدة أضف JSON مثل:
+{"authType":"bearer","appKeyEnv":"COUPANG_KEY","queryParam":"keyword","responseMapping":"data.products","fieldMapping":{"name":"productName","price":"salePrice","image":"thumbnail","url":"productUrl"}}'></textarea>
+        <span class="form-hint">للمصادر المعروفة (AliExpress/Amazon/Google) — اتركه فارغاً، الإعدادات محفوظة تلقائياً</span>
       </div>
-      <div class="form-group form-full"><label class="form-label">ملاحظات</label><textarea class="form-textarea" id="src-notes"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('addSource')">إلغاء</button>
@@ -1618,16 +1582,12 @@ async function editSource(id) {
   document.getElementById('src-type').value    = s.type;
   document.getElementById('src-priority').value= s.priority;
   document.getElementById('src-url').value     = s.url||'';
-  document.getElementById('src-limit').value         = s.rateLimit||250;
-  document.getElementById('src-timeout').value       = s.timeout||10;
-  document.getElementById('src-notes').value         = s.notes||'';
-  document.getElementById('src-auth-type').value     = s.authType||'none';
-  document.getElementById('src-app-key-env').value   = s.appKeyEnv||'';
-  document.getElementById('src-app-secret-env').value= s.appSecretEnv||'';
-  document.getElementById('src-query-param').value   = s.queryParam||'';
-  document.getElementById('src-response-mapping').value = s.responseMapping||'';
-  document.getElementById('src-api-method').value    = s.apiMethod||'';
-  document.getElementById('src-field-mapping').value = s.fieldMapping ? JSON.stringify(s.fieldMapping) : '';
+  document.getElementById('src-limit').value   = s.rateLimit||250;
+  document.getElementById('src-timeout').value = s.timeout||10;
+  // اعرض الإعدادات المتقدمة كـ JSON في حقل الملاحظات
+  const advFields = ['authType','appKeyEnv','appSecretEnv','queryParam','responseMapping','apiMethod','fieldMapping'];
+  const advObj = {}; advFields.forEach(f=>{ if(s[f]) advObj[f]=s[f]; });
+  document.getElementById('src-notes').value = Object.keys(advObj).length ? JSON.stringify(advObj,null,2) : (s.notes||'');
   clearChips('src-cats-chips','src-cat-in');
   s.categories?.forEach(c=>addChipValue('src-cats-chips',c));
   renderMarketsCheckboxes(s.markets);
@@ -1648,14 +1608,7 @@ async function saveSource() {
     categories:getChips('src-cats-chips'),
     rateLimit: parseInt(document.getElementById('src-limit').value)||250,
     timeout:   parseInt(document.getElementById('src-timeout').value)||10,
-    notes:     document.getElementById('src-notes').value.trim(),
-    authType:        document.getElementById('src-auth-type').value||'none',
-    appKeyEnv:       document.getElementById('src-app-key-env').value.trim()||null,
-    appSecretEnv:    document.getElementById('src-app-secret-env').value.trim()||null,
-    queryParam:      document.getElementById('src-query-param').value.trim()||'keywords',
-    responseMapping: document.getElementById('src-response-mapping').value.trim()||null,
-    apiMethod:       document.getElementById('src-api-method').value.trim()||null,
-    fieldMapping: (() => { try { const v=document.getElementById('src-field-mapping').value.trim(); return v?JSON.parse(v):null; } catch(e){ return null; } })(),
+    ...(() => { try { const n=document.getElementById('src-notes').value.trim(); const parsed=JSON.parse(n); const {authType,appKeyEnv,appSecretEnv,queryParam,responseMapping,apiMethod,fieldMapping,...rest}=parsed; return {authType,appKeyEnv,appSecretEnv,queryParam,responseMapping,apiMethod,fieldMapping,notes:''}; } catch(e){ return {notes:document.getElementById('src-notes').value.trim()}; } })(),
     active:    true,
   };
   const r = await fetch('/api/admin/config', {headers:H});
