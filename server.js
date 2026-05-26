@@ -229,17 +229,17 @@ CATEGORY IDENTIFICATION RULES (be exact):
 - Sneakers/shoes → category: "sneakers"
 - Smartphone → category: "smartphone"
 
-SEARCH QUERY CONSTRUCTION (5 queries, all must be same category):
-Q1 [Ultra specific]: brand + exact product name + color + key feature
-   Example: "Bourjois Paris little round pot eyeshadow palette nude"
-Q2 [Brand + type]: brand + category + finish/style
-   Example: "Bourjois eyeshadow palette shimmer matte"
-Q3 [Features only]: category + colors + finish + style
-   Example: "eyeshadow palette brown nude tones shimmer matte"
-Q4 [Buy intent]: "buy " + brand + category OR if cheaper: "affordable " + category + " dupe"
-Q5 [Broad]: category + main color + finish
+SEARCH QUERY CONSTRUCTION — 5 queries, SHORT (max 4 words each), same category:
+Q1: brand + category (e.g. "Tommy Hilfiger watch")
+Q2: brand + category + 1 key feature (e.g. "Tommy Hilfiger sport watch")
+Q3: category + color/style (e.g. "navy blue sport watch")
+Q4: brand + category + cheaper if needed (e.g. "Tommy Hilfiger watch affordable")
+Q5: category only — most general (e.g. "men sport watch")
 
-ALL 5 QUERIES must match the SAME product category. Never mix.
+RULES:
+- MAX 4 WORDS per query — Amazon/AliExpress fail with long queries
+- All queries same category
+- Never include more than 1 adjective per query
 
 Extract from image:
 - Exact brand (read any visible text/logo)
@@ -760,11 +760,15 @@ async function universalSearch(source, query, market, wantCheaper) {
     };
     const targetCurrency = marketCurrency[market] || 'USD';
 
+    // تقصير الـ query — Amazon و AliExpress يعملان أفضل مع 3-4 كلمات
+    const shortenQuery = (q) => q.split(' ').slice(0, 4).join(' ');
+    const cleanQuery   = shortenQuery(query);
+
     const baseParams = {
       // حقول قياسية — يمكن تخصيصها من source.queryParams
       ...(source.queryParams || {}),
       // inject اسم الـ query حسب ما يسميه كل API
-      [source.queryParam || 'keywords']: wantCheaper ? `${query} budget` : query,
+      [source.queryParam || 'keywords']: wantCheaper ? `${cleanQuery} budget` : cleanQuery,
     };
 
     // AliExpress — أضف العملة المحلية تلقائياً
@@ -862,8 +866,9 @@ async function runSource(source, { queries, imageBase64, market, wantCheaper }) 
     if (source.type === 'serpapi_shopping') {
       const results = [];
       for (const q of validTerms.slice(0, 3)) {
+        const short = q.split(' ').slice(0, 5).join(' ');
         const r = await searchWithGoogleShopping(
-          wantCheaper ? `${q} budget affordable` : q, market
+          wantCheaper ? `${short} budget affordable` : short, market
         );
         if (r?.length) results.push(...r);
       }
@@ -871,10 +876,17 @@ async function runSource(source, { queries, imageBase64, market, wantCheaper }) 
     }
 
     // ── كل المصادر الأخرى → Universal Engine ──
+    // نستخدم أول query (الأكثر عمومية) + الخامسة (الأعم) فقط
     const results = [];
-    for (const q of validTerms.slice(0, 2)) {
+    const queriesToTry = [
+      validTerms[0],                          // Q1: brand + type
+      validTerms[validTerms.length - 1],      // Q5: الأعم
+    ].filter(Boolean).filter((q, i, arr) => arr.indexOf(q) === i);
+
+    for (const q of queriesToTry) {
       const r = await universalSearch(source, q, market, wantCheaper);
       if (r?.length) results.push(...r);
+      if (results.length >= 6) break; // كافي
     }
     return results;
 
