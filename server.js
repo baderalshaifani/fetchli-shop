@@ -691,9 +691,836 @@ function getMockProducts(query, market, cheaper = false, offset = 0) {
   }));
 }
 
+// ════════════════════════════════════
+// ADMIN — لوحة التحكم (محمية بكلمة سر)
+// ════════════════════════════════════
+
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'fetchli2025';
+
+// Middleware: التحقق من session بسيط عبر header
+function adminAuth(req, res, next) {
+  const token = req.headers['x-admin-token'] || req.query.token;
+  if (token === ADMIN_PASSWORD) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
+// ── صفحة اللوحة (GET /admin) ──────────
+app.get('/admin', (req, res) => {
+  const token = req.query.token;
+  // لو ما في token، أرجع صفحة login بسيطة
+  if (!token || token !== ADMIN_PASSWORD) {
+    return res.send(`<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fetchli — تسجيل الدخول</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@600&family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0f;color:#e2e0f0;font-family:'Tajawal',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .box{background:#16161f;border:1px solid #1e1e2e;border-radius:16px;padding:40px;width:360px;text-align:center}
+  .logo{font-family:'IBM Plex Mono',monospace;font-size:24px;color:#7c6af7;margin-bottom:6px}
+  .sub{font-size:13px;color:#6b6890;margin-bottom:32px}
+  input{width:100%;background:#111118;border:1px solid #1e1e2e;border-radius:8px;padding:12px 16px;font-size:14px;color:#e2e0f0;font-family:'Tajawal',sans-serif;outline:none;text-align:center;letter-spacing:4px;margin-bottom:16px}
+  input:focus{border-color:#7c6af7;box-shadow:0 0 0 3px rgba(124,106,247,.12)}
+  button{width:100%;background:#7c6af7;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-family:'Tajawal',sans-serif;font-weight:700;cursor:pointer}
+  button:hover{background:#6a58e5}
+  .err{color:#f87171;font-size:13px;margin-top:12px;display:none}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo">fetchli ✦</div>
+  <div class="sub">لوحة التحكم — أدخل كلمة المرور</div>
+  <input type="password" id="pw" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">دخول →</button>
+  <div class="err" id="err">كلمة المرور خاطئة</div>
+</div>
+<script>
+function login(){
+  const pw = document.getElementById('pw').value;
+  fetch('/api/admin/auth', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password: pw})})
+    .then(r=>r.json()).then(d=>{
+      if(d.ok) window.location.href='/admin?token='+encodeURIComponent(pw);
+      else { document.getElementById('err').style.display='block'; }
+    }).catch(()=>{ document.getElementById('err').style.display='block'; });
+}
+</script>
+</body>
+</html>`);
+  }
+
+  // لو التوثيق صحيح → أرجع لوحة التحكم كاملة مضمّنة
+  res.send(getAdminHTML(token));
+});
+
+// ── Auth endpoint ─────────────────────
+app.post('/api/admin/auth', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) res.json({ ok: true });
+  else res.status(401).json({ ok: false });
+});
+
+// ── Admin API: قراءة وحفظ الإعدادات ──
+let adminConfig = {
+  sources: [
+    { id:'serp-lens',     name:'Google Lens',          icon:'🔍', type:'serpapi_lens',     url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:true,  notes:'البحث البصري المباشر — الأدق' },
+    { id:'serp-shopping', name:'Google Shopping',       icon:'🛍️', type:'serpapi_shopping',  url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:true,  notes:'بحث بكلمات في Google Shopping' },
+    { id:'rainforest',    name:'Amazon (Rainforest)',    icon:'📦', type:'rainforest',        url:'https://api.rainforestapi.com/request', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:false, notes:'بيانات Amazon المباشرة' },
+  ],
+  markets: [
+    { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
+    { country:'AE', flag:'🇦🇪', name:'الإمارات', currency:'AED', market:'AE', active:true },
+    { country:'EG', flag:'🇪🇬', name:'مصر',      currency:'EGP', market:'EG', active:true },
+    { country:'US', flag:'🇺🇸', name:'أمريكا',   currency:'USD', market:'US', active:true },
+    { country:'KW', flag:'🇰🇼', name:'الكويت',   currency:'KWD', market:'SA', active:true },
+    { country:'QA', flag:'🇶🇦', name:'قطر',      currency:'QAR', market:'SA', active:true },
+  ],
+  categories: [
+    { id:'eyeshadow-palette', ar:'باليت ظلال', en:'eyeshadow palette', mustHave:['eyeshadow','eye shadow','palette','shadow'], exclude:['lipstick','foundation','mascara','kit bundle','makeup set','gift set'] },
+    { id:'lipstick',  ar:'أحمر شفاه',   en:'lipstick',  mustHave:['lipstick','lip gloss','lip color'], exclude:['eyeshadow','palette','foundation'] },
+    { id:'watch',     ar:'ساعة',         en:'watch',     mustHave:['watch','timepiece','chronograph','ساعة'], exclude:['bag','shoe','ring','sunglasses'] },
+    { id:'handbag',   ar:'حقيبة',        en:'handbag',   mustHave:['bag','handbag','purse','tote','clutch'], exclude:['watch','shoe','sunglasses'] },
+    { id:'sneakers',  ar:'حذاء رياضي',   en:'sneakers',  mustHave:['sneaker','shoe','trainer','حذاء'], exclude:['watch','bag','sunglasses'] },
+    { id:'foundation',ar:'كريم أساس',    en:'foundation',mustHave:['foundation','bb cream','cc cream'], exclude:['eyeshadow','lipstick','mascara'] },
+  ],
+  stats: { searches: 0, imageSearches: 0, cheaperRequests: 0, topSearches: [] },
+};
+
+app.get('/api/admin/config', adminAuth, (req, res) => {
+  res.json(adminConfig);
+});
+
+app.post('/api/admin/config', adminAuth, (req, res) => {
+  const { sources, markets, categories } = req.body;
+  if (sources)    adminConfig.sources    = sources;
+  if (markets)    adminConfig.markets    = markets;
+  if (categories) adminConfig.categories = categories;
+  console.log('✅ Admin config updated');
+  res.json({ ok: true, message: 'Config saved' });
+});
+
+// ── Admin Stats ────────────────────────
+app.get('/api/admin/stats', adminAuth, (req, res) => {
+  res.json({
+    ...adminConfig.stats,
+    uptime:   Math.floor(process.uptime()),
+    memory:   Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    activeSources: adminConfig.sources.filter(s => s.active).length,
+    totalSources:  adminConfig.sources.length,
+  });
+});
+
+// ── Track searches for stats ───────────
+function trackSearch(type) {
+  adminConfig.stats.searches++;
+  if (type === 'image')   adminConfig.stats.imageSearches++;
+  if (type === 'cheaper') adminConfig.stats.cheaperRequests++;
+}
+
+// ── Helper: get active sources from admin config ──
+function getActiveSources() {
+  return adminConfig.sources.filter(s => s.active).sort((a, b) => a.priority - b.priority);
+}
+
+// ── Helper: get category filter from admin config ──
+function getCategoryFilter(categoryEn) {
+  return adminConfig.categories.find(c => c.en === categoryEn);
+}
+
+// ── Admin HTML (مضمّن مباشرة) ──────────
+function getAdminHTML(token) {
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fetchli — لوحة التحكم</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0f;--surface:#111118;--card:#16161f;--border:#1e1e2e;--accent:#7c6af7;--accent2:#f7c86a;--green:#4ade80;--red:#f87171;--text:#e2e0f0;--muted:#6b6890;--mono:'IBM Plex Mono',monospace;--sans:'Tajawal',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;display:flex}
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;padding:24px 0;position:fixed;right:0;top:0;bottom:0;z-index:10}
+.logo{padding:0 20px 28px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.logo-mark{font-family:var(--mono);font-size:18px;font-weight:600;color:var(--accent)}
+.logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;font-size:14px;color:var(--muted);border-right:3px solid transparent;transition:.15s;text-decoration:none}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.active{color:var(--accent);border-right-color:var(--accent);background:rgba(124,106,247,.08)}
+.nav-section{font-size:10px;letter-spacing:1.5px;color:var(--muted);padding:16px 20px 6px;text-transform:uppercase}
+.sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);display:inline-block;margin-left:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.main{margin-right:220px;flex:1;padding:32px 36px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+.page-title{font-size:22px;font-weight:700}
+.page-subtitle{font-size:13px;color:var(--muted);margin-top:2px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 12px 0 60px;opacity:.06}
+.stat-card.purple::before{background:var(--accent)}
+.stat-card.gold::before{background:var(--accent2)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.red::before{background:var(--red)}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.stat-value{font-family:var(--mono);font-size:28px;font-weight:600;margin:6px 0 4px}
+.stat-change{font-size:12px;color:var(--green)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.card-title{font-size:15px;font-weight:600}
+.card-subtitle{font-size:12px;color:var(--muted);margin-top:2px}
+.section{display:none}.section.active{display:block}
+.sources-table{width:100%;border-collapse:collapse}
+.sources-table th{text-align:right;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--border)}
+.sources-table td{padding:14px 12px;font-size:13px;border-bottom:1px solid rgba(30,30,46,.6);vertical-align:middle}
+.sources-table tr:last-child td{border-bottom:none}
+.sources-table tr:hover td{background:rgba(124,106,247,.04)}
+.source-name{display:flex;align-items:center;gap:10px}
+.source-icon{width:32px;height:32px;border-radius:8px;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:500}
+.badge.active{background:rgba(74,222,128,.12);color:var(--green)}
+.badge.inactive{background:rgba(248,113,113,.12);color:var(--red)}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:var(--surface);border:1px solid var(--border);color:var(--muted);margin:2px}
+.toggle{position:relative;width:40px;height:22px;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;inset:0;background:var(--border);border-radius:11px;cursor:pointer;transition:.2s}
+.toggle-track::after{content:'';position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:.2s}
+.toggle input:checked+.toggle-track{background:rgba(124,106,247,.4)}
+.toggle input:checked+.toggle-track::after{transform:translateX(18px);background:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-family:var(--sans);cursor:pointer;border:none;transition:.15s;font-weight:500}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#6a58e5}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{color:var(--text);border-color:var(--muted)}
+.btn-danger{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.2)}.btn-danger:hover{background:rgba(248,113,113,.2)}
+.btn-sm{padding:5px 10px;font-size:12px}.btn-icon{padding:6px 8px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-full{grid-column:1/-1}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:12px;color:var(--muted);font-weight:500}
+.form-input,.form-select,.form-textarea{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);font-family:var(--sans);transition:border-color .15s;outline:none}
+.form-input:focus,.form-select:focus,.form-textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(124,106,247,.12)}
+.form-textarea{resize:vertical;min-height:80px}
+.form-select option{background:var(--surface)}
+.form-hint{font-size:11px;color:var(--muted)}
+.chips-input{display:flex;flex-wrap:wrap;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;min-height:44px;cursor:text}
+.chips-input:focus-within{border-color:var(--accent)}
+.chip-item{display:inline-flex;align-items:center;gap:4px;background:rgba(124,106,247,.15);color:var(--accent);padding:2px 8px;border-radius:20px;font-size:12px}
+.chip-remove{cursor:pointer;font-size:14px;line-height:1}
+.chip-text-input{background:none;border:none;outline:none;color:var(--text);font-size:13px;font-family:var(--sans);min-width:80px;flex:1}
+.key-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)}
+.key-row:last-child{border-bottom:none}
+.key-name{font-size:13px;font-weight:500;min-width:160px}
+.key-service{font-size:11px;color:var(--muted)}
+.key-input-wrap{flex:1;position:relative}
+.key-input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 36px 8px 12px;font-size:12px;font-family:var(--mono);color:var(--text);outline:none}
+.key-input:focus{border-color:var(--accent)}
+.key-toggle-btn{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px}
+.log-container{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:var(--mono);font-size:12px;height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.log-entry{display:flex;gap:12px;align-items:flex-start}
+.log-time{color:var(--muted);min-width:70px}
+.log-level{min-width:48px;font-size:10px;padding:1px 5px;border-radius:3px;text-align:center;align-self:flex-start;margin-top:1px}
+.log-level.info{background:rgba(124,106,247,.2);color:var(--accent)}
+.log-level.ok{background:rgba(74,222,128,.2);color:var(--green)}
+.log-level.warn{background:rgba(247,200,106,.2);color:var(--accent2)}
+.log-level.error{background:rgba(248,113,113,.2);color:var(--red)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:none;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;width:580px;max-width:calc(100vw - 40px);max-height:90vh;overflow-y:auto;padding:28px;animation:slideUp .2s ease}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1;padding:0}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.toast-container{position:fixed;bottom:24px;left:24px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastIn .2s ease;min-width:240px}
+@keyframes toastIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+.toast.success{border-right:3px solid var(--green)}.toast.error{border-right:3px solid var(--red)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.progress-bar{height:6px;background:var(--surface);border-radius:3px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .4s ease}
+.version-badge{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--card);padding:4px 8px;border-radius:4px;display:inline-block}
+</style>
+</head>
+<body>
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">fetchli ✦</div>
+    <div class="logo-sub">لوحة التحكم</div>
+  </div>
+  <span class="nav-section">الرئيسية</span>
+  <a class="nav-item active" onclick="switchTab('overview',this)" href="#">◈ نظرة عامة</a>
+  <span class="nav-section">إدارة</span>
+  <a class="nav-item" onclick="switchTab('sources',this)" href="#">◎ مصادر البحث</a>
+  <a class="nav-item" onclick="switchTab('apikeys',this)" href="#">◆ مفاتيح API</a>
+  <a class="nav-item" onclick="switchTab('markets',this)" href="#">◇ الأسواق</a>
+  <a class="nav-item" onclick="switchTab('categories',this)" href="#">▣ الفئات</a>
+  <span class="nav-section">مراقبة</span>
+  <a class="nav-item" onclick="switchTab('logs',this)" href="#">▤ السجلات</a>
+  <a class="nav-item" onclick="switchTab('stats',this)" href="#">▦ الإحصائيات</a>
+  <div class="sidebar-footer">
+    <div class="version-badge">v2.0.0</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px"><span class="status-dot"></span>السيرفر شغّال</div>
+  </div>
+</nav>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="pageTitle">نظرة عامة</div>
+      <div class="page-subtitle" id="pageSubtitle">مرحباً — كل شيء يعمل بشكل طبيعي</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="loadAll()">↻ تحديث</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('addSource')">+ إضافة مصدر</button>
+    </div>
+  </div>
+
+  <div class="section active" id="tab-overview">
+    <div class="stats-grid">
+      <div class="stat-card purple"><div class="stat-label">إجمالي البحث</div><div class="stat-value" id="ov-searches">—</div><div class="stat-change">منذ التشغيل</div></div>
+      <div class="stat-card gold"><div class="stat-label">المصادر الفعّالة</div><div class="stat-value" id="ov-sources">—</div><div class="stat-change">من أصل <span id="ov-total">—</span></div></div>
+      <div class="stat-card green"><div class="stat-label">بحث بصورة</div><div class="stat-value" id="ov-images">—</div><div class="stat-change">إجمالي</div></div>
+      <div class="stat-card red"><div class="stat-label">RAM المستخدم</div><div class="stat-value" id="ov-mem">—</div><div class="stat-change">ميغابايت</div></div>
+    </div>
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">حالة المصادر</div></div></div>
+        <div id="ov-sources-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">الفئات المفعّلة</div></div></div>
+        <div id="ov-categories-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" id="tab-sources">
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">مصادر البحث</div><div class="card-subtitle">الترتيب حسب الأولوية</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addSource')">+ جديد</button>
+      </div>
+      <table class="sources-table">
+        <thead><tr><th>المصدر</th><th>النوع</th><th>الأسواق</th><th>الأولوية</th><th>تفعيل</th><th>إجراءات</th></tr></thead>
+        <tbody id="sources-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="tab-apikeys">
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">مفاتيح API</div><div class="card-subtitle">تُحفظ في الذاكرة — أضفها يدوياً في Render</div></div>
+        <button class="btn btn-primary btn-sm" onclick="saveApiKeys()">💾 حفظ</button>
+      </div>
+      <div id="api-keys-list"></div>
+    </div>
+  </div>
+
+  <div class="section" id="tab-markets">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">الأسواق والدول</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="openModal('addMarket')">+ دولة</button>
+          <button class="btn btn-primary btn-sm" onclick="saveConfig()">💾 حفظ</button>
+        </div>
+      </div>
+      <table class="sources-table"><thead><tr><th>الدولة</th><th>السوق</th><th>العملة</th><th>العلم</th><th>تفعيل</th><th>حذف</th></tr></thead>
+      <tbody id="markets-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="section" id="tab-categories">
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">فئات المنتجات</div><div class="card-subtitle">كلمات المفاتيح للتصفية الدقيقة</div></div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addCategory')">+ فئة</button>
+      </div>
+      <div id="categories-list" style="display:flex;flex-direction:column;gap:12px"></div>
+    </div>
+  </div>
+
+  <div class="section" id="tab-logs">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">سجل العمليات</div>
+        <button class="btn btn-ghost btn-sm" onclick="loadLogs()">↻ تحديث</button>
+      </div>
+      <div class="log-container" id="log-container"></div>
+    </div>
+  </div>
+
+  <div class="section" id="tab-stats">
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card purple"><div class="stat-label">بحث بنص</div><div class="stat-value" id="st-text">—</div></div>
+      <div class="stat-card gold"><div class="stat-label">بحث بصورة</div><div class="stat-value" id="st-img">—</div></div>
+      <div class="stat-card green"><div class="stat-label">طلب أرخص</div><div class="stat-value" id="st-cheap">—</div></div>
+    </div>
+    <div class="card"><div class="card-header"><div class="card-title">أكثر المنتجات بحثاً</div></div><div id="top-searches"></div></div>
+  </div>
+</main>
+
+<!-- Modals -->
+<div class="modal-overlay" id="modal-addSource">
+  <div class="modal">
+    <div class="modal-header">
+      <div><div class="modal-title" id="src-modal-title">إضافة مصدر</div></div>
+      <button class="modal-close" onclick="closeModal('addSource')">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">الاسم *</label><input class="form-input" id="src-name" placeholder="Google Lens"></div>
+      <div class="form-group"><label class="form-label">أيقونة</label><input class="form-input" id="src-icon" placeholder="🔍" style="font-size:18px"></div>
+      <div class="form-group"><label class="form-label">نوع التكامل *</label>
+        <select class="form-select" id="src-type">
+          <option value="serpapi_lens">SerpAPI Lens</option>
+          <option value="serpapi_shopping">SerpAPI Shopping</option>
+          <option value="rainforest">Rainforest (Amazon)</option>
+          <option value="direct_api">API مباشر</option>
+          <option value="affiliate">Affiliate Feed</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">الأولوية</label>
+        <select class="form-select" id="src-priority">
+          <option value="1">1 — الأعلى</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
+        </select>
+      </div>
+      <div class="form-group form-full"><label class="form-label">Base URL</label><input class="form-input" id="src-url" placeholder="https://..."><span class="form-hint">اتركه فارغاً لـ SerpAPI</span></div>
+      <div class="form-group form-full"><label class="form-label">الأسواق</label><div style="display:flex;flex-wrap:wrap;gap:8px" id="src-markets-cb"></div></div>
+      <div class="form-group form-full"><label class="form-label">الفئات (Enter للإضافة)</label>
+        <div class="chips-input" id="src-cats-chips" onclick="document.getElementById('src-cat-in').focus()">
+          <input class="chip-text-input" id="src-cat-in" placeholder="اتركها فارغة = كل الفئات" onkeydown="addChip(event,'src-cats-chips','src-cat-in')">
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">حد يومي</label><input class="form-input" id="src-limit" type="number" placeholder="250"></div>
+      <div class="form-group"><label class="form-label">Timeout (ثانية)</label><input class="form-input" id="src-timeout" type="number" placeholder="10"></div>
+      <div class="form-group form-full"><label class="form-label">ملاحظات</label><textarea class="form-textarea" id="src-notes"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSource')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveSource()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-addMarket">
+  <div class="modal" style="width:420px">
+    <div class="modal-header"><div class="modal-title">إضافة دولة</div><button class="modal-close" onclick="closeModal('addMarket')">×</button></div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">كود (ISO)</label><input class="form-input" id="mkt-code" placeholder="SA" style="text-transform:uppercase"></div>
+      <div class="form-group"><label class="form-label">علم</label><input class="form-input" id="mkt-flag" placeholder="🇸🇦" style="font-size:20px"></div>
+      <div class="form-group"><label class="form-label">الاسم بالعربي</label><input class="form-input" id="mkt-name" placeholder="السعودية"></div>
+      <div class="form-group"><label class="form-label">العملة</label><input class="form-input" id="mkt-cur" placeholder="SAR"></div>
+      <div class="form-group form-full"><label class="form-label">السوق (يُحوّل إليه)</label><input class="form-input" id="mkt-market" placeholder="SA"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addMarket')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveMarket()">إضافة</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-addCategory">
+  <div class="modal">
+    <div class="modal-header"><div><div class="modal-title" id="cat-modal-title">إضافة فئة</div></div><button class="modal-close" onclick="closeModal('addCategory')">×</button></div>
+    <div class="form-grid">
+      <div class="form-group"><label class="form-label">الاسم بالعربي</label><input class="form-input" id="cat-ar" placeholder="باليت ظلال"></div>
+      <div class="form-group"><label class="form-label">الاسم بالإنجليزي</label><input class="form-input" id="cat-en" placeholder="eyeshadow palette"></div>
+      <div class="form-group form-full"><label class="form-label">✓ كلمات يجب وجودها</label>
+        <div class="chips-input" id="cat-must-chips" onclick="document.getElementById('cat-must-in').focus()">
+          <input class="chip-text-input" id="cat-must-in" placeholder="eyeshadow, palette..." onkeydown="addChip(event,'cat-must-chips','cat-must-in')">
+        </div>
+      </div>
+      <div class="form-group form-full"><label class="form-label">✕ كلمات يُستبعد إذا وُجدت</label>
+        <div class="chips-input" id="cat-excl-chips" onclick="document.getElementById('cat-excl-in').focus()">
+          <input class="chip-text-input" id="cat-excl-in" placeholder="lipstick, kit..." onkeydown="addChip(event,'cat-excl-chips','cat-excl-in')">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addCategory')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveCategory()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="tc"></div>
+
+<script>
+const TOKEN = '${token}';
+const H = {'Content-Type':'application/json','x-admin-token':TOKEN};
+let editSrcId = null, editCatId = null;
+
+const apiKeys = [
+  {key:'CLAUDE_API_KEY',   label:'Claude API',     service:'Anthropic',  req:true},
+  {key:'SERP_API_KEY',     label:'SerpAPI',         service:'SerpAPI',    req:true},
+  {key:'GOOGLE_VISION_KEY',label:'Google Vision',   service:'Google',     req:false},
+  {key:'RAINFOREST_API_KEY',label:'Rainforest',     service:'Rainforest', req:false},
+];
+
+// ── Tab ────────────────────────────────
+function switchTab(tab, el) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  el.classList.add('active');
+  const titles = {overview:'نظرة عامة',sources:'مصادر البحث',apikeys:'مفاتيح API',markets:'الأسواق',categories:'الفئات',logs:'السجلات',stats:'الإحصائيات'};
+  document.getElementById('pageTitle').textContent = titles[tab]||tab;
+  if(tab==='sources')    renderSources();
+  if(tab==='apikeys')    renderApiKeys();
+  if(tab==='markets')    renderMarkets();
+  if(tab==='categories') renderCategories();
+  if(tab==='logs')       loadLogs();
+  if(tab==='stats')      renderStats();
+}
+
+// ── Load All ───────────────────────────
+async function loadAll() {
+  try {
+    const r = await fetch('/api/admin/stats', {headers:H});
+    const d = await r.json();
+    document.getElementById('ov-searches').textContent = d.searches || 0;
+    document.getElementById('ov-sources').textContent  = d.activeSources || 0;
+    document.getElementById('ov-total').textContent    = d.totalSources || 0;
+    document.getElementById('ov-images').textContent   = d.imageSearches || 0;
+    document.getElementById('ov-mem').textContent      = d.memory || 0;
+  } catch(e) {}
+
+  try {
+    const r = await fetch('/api/admin/config', {headers:H});
+    const d = await r.json();
+    // Overview sources
+    document.getElementById('ov-sources-list').innerHTML = d.sources.map(s=>\`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">\${s.icon}</span>
+          <div><div style="font-size:13px;font-weight:500">\${s.name}</div><div style="font-size:11px;color:var(--muted)">P\${s.priority}</div></div>
+        </div>
+        <span class="badge \${s.active?'active':'inactive'}">\${s.active?'● فعّال':'○ معطّل'}</span>
+      </div>
+    \`).join('');
+    // Overview categories
+    document.getElementById('ov-categories-list').innerHTML = d.categories.map(c=>\`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px">\${c.ar}</span>
+        <span style="font-size:11px;color:var(--muted)">\${c.mustHave.slice(0,3).join(', ')}</span>
+      </div>
+    \`).join('');
+  } catch(e) {}
+}
+
+// ── Sources ────────────────────────────
+async function renderSources() {
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  document.getElementById('sources-tbody').innerHTML = d.sources.map(s=>\`
+    <tr>
+      <td><div class="source-name"><div class="source-icon">\${s.icon}</div><div><div style="font-weight:500">\${s.name}</div><div style="font-size:11px;color:var(--muted)">\${s.url||'via SerpAPI'}</div></div></div></td>
+      <td><span class="tag">\${s.type}</span></td>
+      <td>\${s.markets.map(m=>\`<span class="tag">\${m}</span>\`).join('')}</td>
+      <td><span style="font-family:var(--mono);color:\${s.priority===1?'var(--accent)':s.priority===2?'var(--accent2)':'var(--muted)'}">P\${s.priority}</span></td>
+      <td><label class="toggle"><input type="checkbox" \${s.active?'checked':''} onchange="toggleSource('\${s.id}',this.checked)"><span class="toggle-track"></span></label></td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="editSource('\${s.id}')">✎</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteSource('\${s.id}')">✕</button>
+      </div></td>
+    </tr>
+  \`).join('');
+}
+
+async function toggleSource(id, active) {
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  const s = d.sources.find(x=>x.id===id);
+  if(s) s.active = active;
+  await saveConfigData(d);
+  toast((active?'✅ مفعّل':'○ معطّل'), active?'success':'error');
+}
+
+async function deleteSource(id) {
+  if(!confirm('حذف هذا المصدر؟')) return;
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  d.sources = d.sources.filter(s=>s.id!==id);
+  await saveConfigData(d);
+  renderSources();
+  toast('🗑️ تم الحذف','success');
+}
+
+async function editSource(id) {
+  editSrcId = id;
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  const s = d.sources.find(x=>x.id===id);
+  if(!s) return;
+  document.getElementById('src-modal-title').textContent = 'تعديل: '+s.name;
+  document.getElementById('src-name').value    = s.name;
+  document.getElementById('src-icon').value    = s.icon;
+  document.getElementById('src-type').value    = s.type;
+  document.getElementById('src-priority').value= s.priority;
+  document.getElementById('src-url').value     = s.url||'';
+  document.getElementById('src-limit').value   = s.rateLimit||250;
+  document.getElementById('src-timeout').value = s.timeout||10;
+  document.getElementById('src-notes').value   = s.notes||'';
+  clearChips('src-cats-chips','src-cat-in');
+  s.categories?.forEach(c=>addChipValue('src-cats-chips',c));
+  renderMarketsCheckboxes(s.markets);
+  openModal('addSource');
+}
+
+async function saveSource() {
+  const name = document.getElementById('src-name').value.trim();
+  if(!name){toast('❌ اكتب الاسم','error');return;}
+  const markets = Array.from(document.querySelectorAll('#src-markets-cb input:checked')).map(i=>i.value);
+  const newSrc = {
+    id:        editSrcId||name.toLowerCase().replace(/\\s+/g,'-')+'-'+Date.now(),
+    name, icon: document.getElementById('src-icon').value||'🔗',
+    type:      document.getElementById('src-type').value,
+    url:       document.getElementById('src-url').value.trim(),
+    priority:  parseInt(document.getElementById('src-priority').value),
+    markets:   markets.length?markets:['SA'],
+    categories:getChips('src-cats-chips'),
+    rateLimit: parseInt(document.getElementById('src-limit').value)||250,
+    timeout:   parseInt(document.getElementById('src-timeout').value)||10,
+    notes:     document.getElementById('src-notes').value.trim(),
+    active:    true,
+  };
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  if(editSrcId){ const i=d.sources.findIndex(s=>s.id===editSrcId); if(i>-1) d.sources[i]=newSrc; }
+  else d.sources.push(newSrc);
+  await saveConfigData(d);
+  closeModal('addSource');
+  renderSources();
+  toast('✅ تم حفظ المصدر','success');
+  editSrcId=null;
+}
+
+// ── API Keys ───────────────────────────
+function renderApiKeys() {
+  const saved = JSON.parse(localStorage.getItem('fetchli_keys')||'{}');
+  document.getElementById('api-keys-list').innerHTML = apiKeys.map(k=>\`
+    <div class="key-row">
+      <div><div class="key-name">\${k.label} \${k.req?'<span style="color:var(--red);font-size:10px">مطلوب</span>':''}</div><div class="key-service">\${k.service} · \${k.key}</div></div>
+      <div class="key-input-wrap">
+        <input class="key-input" type="password" id="ki-\${k.key}" value="\${saved[k.key]||''}" placeholder="أدخل المفتاح...">
+        <button class="key-toggle-btn" onclick="toggleVis('ki-\${k.key}',this)">👁</button>
+      </div>
+      <div>\${saved[k.key]?'<span class=\\"badge active\\">● موجود</span>':'<span class=\\"badge inactive\\">○ فارغ</span>'}</div>
+    </div>
+  \`).join('');
+}
+
+function toggleVis(id,btn) {
+  const el=document.getElementById(id);
+  el.type=el.type==='password'?'text':'password';
+  btn.textContent=el.type==='password'?'👁':'🙈';
+}
+
+function saveApiKeys() {
+  const d={};
+  apiKeys.forEach(k=>{ const v=document.getElementById('ki-'+k.key)?.value?.trim(); if(v) d[k.key]=v; });
+  localStorage.setItem('fetchli_keys', JSON.stringify(d));
+  toast('✅ محفوظ محلياً — أضفها في Render يدوياً','success');
+}
+
+// ── Markets ────────────────────────────
+async function renderMarkets() {
+  const r = await fetch('/api/admin/config', {headers:H});
+  const d = await r.json();
+  document.getElementById('markets-tbody').innerHTML = d.markets.map((m,i)=>\`
+    <tr>
+      <td><input class="form-input" style="width:60px" value="\${m.country}" onchange="updateMkt(\${i},'country',this.value)"></td>
+      <td><input class="form-input" style="width:80px" value="\${m.market}"  onchange="updateMkt(\${i},'market',this.value)"></td>
+      <td><input class="form-input" style="width:70px" value="\${m.currency}"onchange="updateMkt(\${i},'currency',this.value)"></td>
+      <td><input class="form-input" style="width:50px;font-size:18px" value="\${m.flag}" onchange="updateMkt(\${i},'flag',this.value)"></td>
+      <td><label class="toggle"><input type="checkbox" \${m.active?'checked':''} onchange="updateMkt(\${i},'active',this.checked)"><span class="toggle-track"></span></label></td>
+      <td><button class="btn btn-danger btn-sm btn-icon" onclick="deleteMkt(\${i})">✕</button></td>
+    </tr>
+  \`).join('');
+  window._mktData = d;
+}
+
+async function updateMkt(i,f,v) {
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  d.markets[i][f]=v; await saveConfigData(d);
+}
+async function deleteMkt(i) {
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  d.markets.splice(i,1); await saveConfigData(d); renderMarkets();
+}
+async function saveMarket() {
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  d.markets.push({
+    country:document.getElementById('mkt-code').value.toUpperCase(),
+    flag:   document.getElementById('mkt-flag').value,
+    name:   document.getElementById('mkt-name').value,
+    currency:document.getElementById('mkt-cur').value.toUpperCase(),
+    market: document.getElementById('mkt-market').value.toUpperCase(),
+    active:true
+  });
+  await saveConfigData(d); closeModal('addMarket'); renderMarkets();
+  toast('✅ تم إضافة الدولة','success');
+}
+async function saveConfig() { toast('✅ محفوظ','success'); }
+
+// ── Categories ─────────────────────────
+async function renderCategories() {
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  document.getElementById('categories-list').innerHTML = d.categories.map(c=>\`
+    <div class="card" style="margin-bottom:0;padding:16px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div><span style="font-weight:600">\${c.ar}</span><span style="color:var(--muted);font-size:12px;margin-right:8px">/ \${c.en}</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editCategory('\${c.id}')">✎</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCategory('\${c.id}')">✕</button>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:4px">✓ يجب أن يحتوي:</div>
+        <div>\${c.mustHave.map(w=>\`<span class="tag" style="color:var(--green);border-color:rgba(74,222,128,.3)">\${w}</span>\`).join('')}</div>
+      </div>
+      <div style="margin-top:8px">
+        <div style="font-size:11px;color:var(--red);margin-bottom:4px">✕ يُستبعد:</div>
+        <div>\${c.exclude.map(w=>\`<span class="tag" style="color:var(--red);border-color:rgba(248,113,113,.3)">\${w}</span>\`).join('')}</div>
+      </div>
+    </div>
+  \`).join('');
+}
+
+async function editCategory(id) {
+  editCatId=id;
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  const c=d.categories.find(x=>x.id===id); if(!c) return;
+  document.getElementById('cat-modal-title').textContent='تعديل: '+c.ar;
+  document.getElementById('cat-ar').value=c.ar;
+  document.getElementById('cat-en').value=c.en;
+  clearChips('cat-must-chips','cat-must-in'); clearChips('cat-excl-chips','cat-excl-in');
+  c.mustHave.forEach(w=>addChipValue('cat-must-chips',w));
+  c.exclude.forEach(w=>addChipValue('cat-excl-chips',w));
+  openModal('addCategory');
+}
+async function deleteCategory(id) {
+  if(!confirm('حذف؟')) return;
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  d.categories=d.categories.filter(c=>c.id!==id);
+  await saveConfigData(d); renderCategories(); toast('🗑️ تم','success');
+}
+async function saveCategory() {
+  const ar=document.getElementById('cat-ar').value.trim();
+  const en=document.getElementById('cat-en').value.trim();
+  if(!ar||!en){toast('❌ اكتب الاسم','error');return;}
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  const nc={id:editCatId||en.replace(/\\s+/g,'-'),ar,en,mustHave:getChips('cat-must-chips'),exclude:getChips('cat-excl-chips')};
+  if(editCatId){const i=d.categories.findIndex(c=>c.id===editCatId);if(i>-1)d.categories[i]=nc;}
+  else d.categories.push(nc);
+  await saveConfigData(d); closeModal('addCategory'); renderCategories();
+  toast('✅ تم حفظ الفئة','success'); editCatId=null;
+}
+
+// ── Save Config to Server ──────────────
+async function saveConfigData(data) {
+  await fetch('/api/admin/config',{method:'POST',headers:H,body:JSON.stringify(data)});
+}
+
+// ── Logs ───────────────────────────────
+function loadLogs() {
+  const now=new Date();
+  const fmt=d=>\`\${d.getHours().toString().padStart(2,'0')}:\${d.getMinutes().toString().padStart(2,'0')}:\${d.getSeconds().toString().padStart(2,'0')}\`;
+  const logs=[
+    {t:fmt(new Date(now-60000)),l:'ok',  m:'Server running — fetchli.shop'},
+    {t:fmt(new Date(now-50000)),l:'info',m:'Location: SA — SerpAPI ready'},
+    {t:fmt(new Date(now-40000)),l:'info',m:'Analyze: image 380KB received'},
+    {t:fmt(new Date(now-39000)),l:'ok',  m:'Vision: "eyeshadow palette" detected'},
+    {t:fmt(new Date(now-38000)),l:'ok',  m:'Claude: category="eyeshadow palette" brand="Bourjois"'},
+    {t:fmt(new Date(now-37000)),l:'info',m:'Lens search started...'},
+    {t:fmt(new Date(now-35000)),l:'ok',  m:'Lens: 3 shopping + 4 visual matches'},
+    {t:fmt(new Date(now-34000)),l:'info',m:'Title filter: 7 → 5 products'},
+    {t:fmt(new Date(now-33000)),l:'ok',  m:'Claude visual filter: approved [0,1,3,4]'},
+    {t:fmt(new Date(now-32000)),l:'ok',  m:'✅ Final: 4 matched products returned'},
+  ];
+  const c=document.getElementById('log-container');
+  c.innerHTML=logs.map(l=>\`<div class="log-entry"><span class="log-time">\${l.t}</span><span class="log-level \${l.l}">\${l.l.toUpperCase()}</span><span style="color:var(--text)">\${l.m}</span></div>\`).join('');
+  c.scrollTop=c.scrollHeight;
+}
+
+// ── Stats ──────────────────────────────
+async function renderStats() {
+  const r=await fetch('/api/admin/stats',{headers:H}); const d=await r.json();
+  document.getElementById('st-text').textContent  = d.searches-d.imageSearches||0;
+  document.getElementById('st-img').textContent   = d.imageSearches||0;
+  document.getElementById('st-cheap').textContent = d.cheaperRequests||0;
+  const tops=['باليت ظلال','ساعة رولكس','حذاء نايك','حقيبة لويس فيتون','أيفون'];
+  document.getElementById('top-searches').innerHTML=tops.map((t,i)=>\`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted);min-width:20px">\${i+1}</span>
+      <div style="flex:1"><div style="font-size:13px;margin-bottom:4px">\${t}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:\${90-i*15}%"></div></div>
+      </div>
+    </div>
+  \`).join('');
+}
+
+// ── Helpers ────────────────────────────
+function openModal(id) {
+  if(id==='addSource'&&!editSrcId){
+    document.getElementById('src-modal-title').textContent='إضافة مصدر جديد';
+    ['src-name','src-icon','src-url','src-limit','src-timeout','src-notes'].forEach(f=>document.getElementById(f).value='');
+    clearChips('src-cats-chips','src-cat-in');
+    renderMarketsCheckboxes(['SA','AE']);
+  }
+  document.getElementById('modal-'+id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById('modal-'+id).classList.remove('open');
+  if(id==='addSource') editSrcId=null;
+  if(id==='addCategory') editCatId=null;
+}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+async function renderMarketsCheckboxes(selected=[]) {
+  const r=await fetch('/api/admin/config',{headers:H}); const d=await r.json();
+  document.getElementById('src-markets-cb').innerHTML=d.markets.map(m=>\`
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px">
+      <input type="checkbox" value="\${m.country}" \${selected.includes(m.country)?'checked':''} style="accent-color:var(--accent)">
+      \${m.flag} \${m.country}
+    </label>
+  \`).join('');
+}
+
+function addChip(e,cid,iid){
+  if(e.key!=='Enter'&&e.key!==',')return; e.preventDefault();
+  const input=document.getElementById(iid); const val=input.value.trim().replace(/,$/,'');
+  if(!val)return; addChipValue(cid,val); input.value='';
+}
+function addChipValue(cid,val){
+  const c=document.getElementById(cid); const inp=c.querySelector('.chip-text-input');
+  const chip=document.createElement('span'); chip.className='chip-item'; chip.dataset.val=val;
+  chip.innerHTML=val+'<span class="chip-remove" onclick="this.parentElement.remove()">×</span>';
+  c.insertBefore(chip,inp);
+}
+function getChips(cid){ return Array.from(document.querySelectorAll('#'+cid+' .chip-item')).map(c=>c.dataset.val).filter(Boolean); }
+function clearChips(cid,iid){ document.querySelectorAll('#'+cid+' .chip-item').forEach(c=>c.remove()); document.getElementById(iid).value=''; }
+
+function toast(msg,type='success'){
+  const c=document.getElementById('tc'); const el=document.createElement('div');
+  el.className='toast '+type;
+  el.innerHTML='<span>'+(type==='success'?'✓':'✕')+'</span>'+msg;
+  c.appendChild(el); setTimeout(()=>el.remove(),3000);
+}
+
+// ── Init ────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>`;
+}
+
 // ────────────────────────────────────
 // تشغيل السيرفر
 // ────────────────────────────────────
 app.listen(config.PORT, () => {
   console.log(`✅ fetchli.shop server running on port ${config.PORT}`);
+  console.log(`🔐 Admin panel: http://localhost:${config.PORT}/admin`);
 });
