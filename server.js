@@ -344,12 +344,34 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const { message, imageBase64, wantCheaper = false } = req.body;
 
-    let visionData = null;
+    // ── المرحلة 1: Vision + Lens معاً (للتعرف فقط) ──
+    let visionData  = null;
+    let lensData    = null;
+
     if (imageBase64) {
-      visionData = await analyzeWithGoogleVision(imageBase64);
+      // شغّلهم بالتوازي لتوفير الوقت
+      [visionData, lensData] = await Promise.all([
+        analyzeWithGoogleVision(imageBase64),
+        identifyWithLens(imageBase64),
+      ]);
       console.log('Vision:', visionData?.bestGuess, '| Logos:', visionData?.logos);
+      console.log('Lens ID:', lensData?.productName, '| Type:', lensData?.productType);
     }
 
+    // ── دمج بيانات Lens في visionData لتقوية Claude ──
+    if (lensData && visionData) {
+      // أضف اسم المنتج من Lens كـ bestGuess لو كان أقوى
+      if (lensData.productName) visionData.bestGuess = lensData.productName;
+      if (lensData.productType) visionData.lensType  = lensData.productType;
+      if (lensData.visualTitles?.length) {
+        visionData.webEntities = [
+          ...(visionData.webEntities || []),
+          ...lensData.visualTitles,
+        ].slice(0, 8);
+      }
+    }
+
+    // ── المرحلة 2: Claude تحليل عميق بكل المعلومات ──
     let analyzed = null;
     try {
       analyzed = await analyzeWithClaude(message, imageBase64, visionData, wantCheaper);
@@ -362,6 +384,10 @@ app.post('/api/analyze', async (req, res) => {
       analyzed = buildFallbackFromVision(visionData, message, wantCheaper);
     }
 
+    // رفع الثقة لو Lens عرّف المنتج بوضوح
+    if (lensData?.productName) {
+      analyzed.confidence = Math.min(98, (analyzed.confidence || 85) + 8);
+    }
     if (visionData?.logos?.length && analyzed.brand) {
       analyzed.confidence = Math.min(98, (analyzed.confidence || 85) + 5);
     }
@@ -781,20 +807,46 @@ async function universalSearch(source, query, market, wantCheaper) {
 // 5. البحث الرئيسي — يقرأ المصادر من adminConfig
 // تفعيل/تعطيل أي مصدر من لوحة التحكم يؤثر فوراً
 // ════════════════════════════════════════════════════════
+// ── Lens للتعرف على المنتج فقط (لا يرجع منتجات للعميل) ──
+async function identifyWithLens(imageBase64) {
+  try {
+    const API_KEY = process.env.SERP_API_KEY;
+    if (!API_KEY || !imageBase64) return null;
+
+    const response = await fetch(`https://serpapi.com/search?engine=google_lens&api_key=${API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_data: imageBase64 }),
+    });
+    const data = await response.json();
+    if (data.error) return null;
+
+    // استخرج اسم المنتج فقط من knowledge graph
+    const kg = data.knowledge_graph;
+    const visualMatches = data.visual_matches || [];
+    
+    return {
+      productName: kg?.title || null,
+      productType: kg?.type  || null,
+      // أفضل 3 عناوين من التطابق البصري كـ context لـ Claude
+      visualTitles: visualMatches.slice(0, 3).map(m => m.title).filter(Boolean),
+    };
+  } catch (err) {
+    console.error('Lens identify error:', err.message);
+    return null;
+  }
+}
+
 async function runSource(source, { queries, imageBase64, market, wantCheaper }) {
   const validTerms = queries.filter(q => q?.trim().length > 0);
 
   // تحقق أن السوق مدعوم
   if (source.markets?.length && !source.markets.includes(market)) return [];
 
-  try {
-    // ── مصادر SerpAPI (تحتاج منطق خاص للصورة) ──
-    if (source.type === 'serpapi_lens') {
-      if (!imageBase64) return [];
-      const result = await searchWithGoogleLens(imageBase64, market);
-      return result?.products || [];
-    }
+  // ── serpapi_lens للتعرف فقط — لا يُستخدم لجلب منتجات ──
+  if (source.type === 'serpapi_lens') return [];
 
+  try {
     if (source.type === 'serpapi_shopping') {
       const results = [];
       for (const q of validTerms.slice(0, 3)) {
@@ -807,7 +859,6 @@ async function runSource(source, { queries, imageBase64, market, wantCheaper }) 
     }
 
     // ── كل المصادر الأخرى → Universal Engine ──
-    // AliExpress, Rainforest, Coupang, eBay, أي API جديد...
     const results = [];
     for (const q of validTerms.slice(0, 2)) {
       const r = await universalSearch(source, q, market, wantCheaper);
@@ -852,11 +903,11 @@ app.post('/api/search', async (req, res) => {
       return res.json({ products: getMockProducts(searchTerms[0], market, wantCheaper, 0), mock: true });
     }
 
-    // ── فلتر العنوان ──
+    // ── فلتر العنوان (دائماً — حتى لو منتج واحد) ──
     let filtered = titleFilter(allProducts, analysis);
 
-    // ── Claude Visual Filter ──
-    if (imageBase64 && analysis && filtered.length > 2) {
+    // ── Claude Visual Filter (حتى لو منتج واحد — لنتأكد أنه صح) ──
+    if (imageBase64 && analysis && filtered.length >= 1) {
       filtered = await claudeVisualFilter(filtered, analysis, imageBase64);
     }
 
