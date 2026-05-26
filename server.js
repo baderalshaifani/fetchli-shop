@@ -536,9 +536,143 @@ JSON only:
 }
 
 // ────────────────────────────────────
-// 5. البحث الرئيسي (محسّن)
-// Pipeline: Lens → Shopping → Title Filter → Claude Visual Filter
+// ★ Rainforest API — Amazon مباشرة
 // ────────────────────────────────────
+async function searchWithRainforest(query, market = 'SA', wantCheaper = false) {
+  try {
+    const API_KEY = process.env.RAINFOREST_API_KEY;
+    if (!API_KEY || !query?.trim()) return null;
+
+    // خريطة السوق → Amazon domain
+    const domainMap = {
+      SA: 'amazon.sa', AE: 'amazon.ae',
+      EG: 'amazon.eg', US: 'amazon.com', CA: 'amazon.ca',
+    };
+    const domain = domainMap[market] || 'amazon.sa';
+
+    const params = new URLSearchParams({
+      api_key:        API_KEY,
+      type:           'search',
+      amazon_domain:  domain,
+      search_term:    wantCheaper ? `${query} budget` : query,
+      sort_by:        wantCheaper ? 'price_low_to_high' : 'relevanceblender',
+      language:       'ar_AE',
+      output:         'json',
+    });
+
+    const url = `https://api.rainforestapi.com/request?${params}`;
+    console.log(`Rainforest: searching "${query}" on ${domain}`);
+
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await response.json();
+
+    if (data.request_info?.success === false) {
+      console.error('Rainforest error:', data.request_info.message);
+      return null;
+    }
+
+    const results = data.search_results || [];
+    if (!results.length) return null;
+    console.log(`Rainforest: ${results.length} results for "${query}"`);
+
+    return results.slice(0, 6).map((item, i) => ({
+      id:         `amz-${i}-${Date.now()}`,
+      name:       item.title?.slice(0, 70) || query,
+      price:      item.price?.raw || item.price?.value
+                    ? `${item.price.value || ''} ${item.price.currency || ''}`
+                    : 'تحقق من السعر',
+      store:      `Amazon ${market}`,
+      image:      item.image || '',
+      url:        item.link || `https://www.${domain}/s?k=${encodeURIComponent(query)}`,
+      badge:      i === 0 ? '📦 Amazon' : item.is_prime ? '✈️ Prime' : '',
+      rating:     item.rating ? String(item.rating) : (4 + Math.random() * 0.9).toFixed(1),
+      reviews:    item.ratings_total,
+      source:     'amazon',
+      matchScore: 75 - i * 3,
+    }));
+  } catch (err) {
+    console.error('Rainforest error:', err.message);
+    return null;
+  }
+}
+
+// ────────────────────────────────────
+// 5. البحث الرئيسي — يقرأ المصادر من adminConfig
+// تفعيل/تعطيل أي مصدر من لوحة التحكم يؤثر فوراً
+// ────────────────────────────────────
+
+// router: يوجّه كل مصدر لدالته المناسبة
+async function runSource(source, { queries, imageBase64, market, wantCheaper }) {
+  const validTerms = queries.filter(q => q?.trim().length > 0);
+
+  // تحقق أن السوق مدعوم
+  if (source.markets?.length && !source.markets.includes(market)) {
+    console.log(`Source ${source.name}: market ${market} not supported, skipping`);
+    return [];
+  }
+
+  try {
+    switch (source.type) {
+
+      case 'serpapi_lens': {
+        if (!imageBase64) return [];
+        const result = await searchWithGoogleLens(imageBase64, market);
+        return result?.products || [];
+      }
+
+      case 'serpapi_shopping': {
+        const results = [];
+        for (const q of validTerms.slice(0, 3)) {
+          const r = await searchWithGoogleShopping(
+            wantCheaper ? `${q} budget affordable` : q, market
+          );
+          if (r?.length) results.push(...r);
+        }
+        return results;
+      }
+
+      case 'rainforest': {
+        const results = [];
+        for (const q of validTerms.slice(0, 2)) {
+          const r = await searchWithRainforest(q, market, wantCheaper);
+          if (r?.length) results.push(...r);
+        }
+        return results;
+      }
+
+      case 'direct_api': {
+        if (!source.url) return [];
+        const results = [];
+        for (const q of validTerms.slice(0, 2)) {
+          try {
+            const r = await fetch(
+              `${source.url}?q=${encodeURIComponent(q)}&market=${market}`,
+              { signal: AbortSignal.timeout((source.timeout || 10) * 1000) }
+            );
+            const d = await r.json();
+            if (d.products?.length) results.push(...d.products.slice(0, 6).map((p, i) => ({
+              id: `direct-${source.id}-${i}`, name: p.name || p.title,
+              price: p.price, store: source.name,
+              image: p.image || p.thumbnail, url: p.url || p.link,
+              rating: p.rating, source: source.id, matchScore: 65 - i * 3,
+            })));
+          } catch (e) { console.error(`Direct API ${source.name}:`, e.message); }
+        }
+        return results;
+      }
+
+      default:
+        console.log(`Unknown source type: ${source.type}`);
+        return [];
+    }
+  } catch (err) {
+    console.error(`Source ${source.name} failed:`, err.message);
+    return [];
+  }
+}
+
 app.post('/api/search', async (req, res) => {
   try {
     const { queries, query, market = 'SA', wantCheaper = false, imageBase64, analysis } = req.body;
@@ -548,41 +682,32 @@ app.post('/api/search', async (req, res) => {
       return res.json({ products: getMockProducts('products', market, false, 0), mock: true });
     }
 
-    let allProducts  = [];
-    let lensProducts = [];
+    // ── جلب المصادر الفعّالة من adminConfig مرتبة بالأولوية ──
+    const activeSources = getActiveSources();
+    console.log(`Active sources: [${activeSources.map(s => s.name).join(', ') || 'none'}]`);
 
-    // ── المرحلة ١: Google Lens (الأدق بصرياً) ──
-    if (imageBase64) {
-      const lensResult = await searchWithGoogleLens(imageBase64, market);
-      if (lensResult?.products?.length) {
-        lensProducts = lensResult.products;
-        if (lensResult.productInfo) {
-          console.log('Lens product:', lensResult.productInfo.name);
-        }
-      }
-    }
-
-    // ── المرحلة ٢: Google Shopping بكلمات Claude الدقيقة ──
-    const validTerms = searchTerms.filter(q => q?.trim().length > 0);
-    for (const q of validTerms.slice(0, 3)) {
-      const results = await searchWithGoogleShopping(
-        wantCheaper ? `${q} budget affordable` : q,
-        market
-      );
-      if (results?.length) allProducts.push(...results);
-    }
-
-    // ── دمج: Lens أولاً ثم Shopping ──
-    const combined = [...lensProducts, ...allProducts];
-
-    if (!combined.length) {
+    if (!activeSources.length) {
       return res.json({ products: getMockProducts(searchTerms[0], market, wantCheaper, 0), mock: true });
     }
 
-    // ── المرحلة ٣: فلتر العنوان (سريع) ──
-    let filtered = titleFilter(combined, analysis);
+    // ── تشغيل كل مصدر فعّال ──
+    let allProducts = [];
+    for (const source of activeSources) {
+      const results = await runSource(source, { queries: searchTerms, imageBase64, market, wantCheaper });
+      if (results.length) {
+        console.log(`  ${source.icon} ${source.name}: ${results.length} results`);
+        allProducts.push(...results);
+      }
+    }
 
-    // ── المرحلة ٤: Claude Visual Filter (الأقوى) ──
+    if (!allProducts.length) {
+      return res.json({ products: getMockProducts(searchTerms[0], market, wantCheaper, 0), mock: true });
+    }
+
+    // ── فلتر العنوان ──
+    let filtered = titleFilter(allProducts, analysis);
+
+    // ── Claude Visual Filter ──
     if (imageBase64 && analysis && filtered.length > 2) {
       filtered = await claudeVisualFilter(filtered, analysis, imageBase64);
     }
@@ -593,8 +718,9 @@ app.post('/api/search', async (req, res) => {
       ? unique.sort((a, b) => extractPrice(a.price) - extractPrice(b.price))
       : unique.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 
-    console.log(`✅ Final result: ${sorted.length} matched products`);
-    res.json({ products: sorted.slice(0, 6), mock: false, source: 'lens+shopping+claude_filter' });
+    const sourceNames = activeSources.map(s => s.name).join(' + ');
+    console.log(`✅ Final: ${sorted.length} products from [${sourceNames}]`);
+    res.json({ products: sorted.slice(0, 6), mock: false, source: sourceNames });
 
   } catch (err) {
     console.error('Search error:', err);
@@ -762,12 +888,15 @@ app.post('/api/admin/auth', (req, res) => {
   else res.status(401).json({ ok: false });
 });
 
-// ── Admin API: قراءة وحفظ الإعدادات ──
-let adminConfig = {
+// ── Admin Config — محفوظ في ملف JSON دائم ──
+const fs         = require('fs');
+const CONFIG_PATH = path.join(__dirname, 'admin-config.json');
+
+const DEFAULT_CONFIG = {
   sources: [
-    { id:'serp-lens',     name:'Google Lens',          icon:'🔍', type:'serpapi_lens',     url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:true,  notes:'البحث البصري المباشر — الأدق' },
-    { id:'serp-shopping', name:'Google Shopping',       icon:'🛍️', type:'serpapi_shopping',  url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:true,  notes:'بحث بكلمات في Google Shopping' },
-    { id:'rainforest',    name:'Amazon (Rainforest)',    icon:'📦', type:'rainforest',        url:'https://api.rainforestapi.com/request', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:false, notes:'بيانات Amazon المباشرة' },
+    { id:'serp-lens',     name:'Google Lens',       icon:'🔍', type:'serpapi_lens',    url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:true,  notes:'البحث البصري المباشر — الأدق' },
+    { id:'serp-shopping', name:'Google Shopping',    icon:'🛍️', type:'serpapi_shopping', url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:true,  notes:'بحث بكلمات في Google Shopping' },
+    { id:'rainforest',    name:'Amazon (Rainforest)',icon:'📦', type:'rainforest',       url:'https://api.rainforestapi.com/request', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:false, notes:'بيانات Amazon المباشرة' },
   ],
   markets: [
     { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
@@ -779,14 +908,46 @@ let adminConfig = {
   ],
   categories: [
     { id:'eyeshadow-palette', ar:'باليت ظلال', en:'eyeshadow palette', mustHave:['eyeshadow','eye shadow','palette','shadow'], exclude:['lipstick','foundation','mascara','kit bundle','makeup set','gift set'] },
-    { id:'lipstick',  ar:'أحمر شفاه',   en:'lipstick',  mustHave:['lipstick','lip gloss','lip color'], exclude:['eyeshadow','palette','foundation'] },
-    { id:'watch',     ar:'ساعة',         en:'watch',     mustHave:['watch','timepiece','chronograph','ساعة'], exclude:['bag','shoe','ring','sunglasses'] },
-    { id:'handbag',   ar:'حقيبة',        en:'handbag',   mustHave:['bag','handbag','purse','tote','clutch'], exclude:['watch','shoe','sunglasses'] },
-    { id:'sneakers',  ar:'حذاء رياضي',   en:'sneakers',  mustHave:['sneaker','shoe','trainer','حذاء'], exclude:['watch','bag','sunglasses'] },
-    { id:'foundation',ar:'كريم أساس',    en:'foundation',mustHave:['foundation','bb cream','cc cream'], exclude:['eyeshadow','lipstick','mascara'] },
+    { id:'lipstick',   ar:'أحمر شفاه',  en:'lipstick',   mustHave:['lipstick','lip gloss','lip color'], exclude:['eyeshadow','palette','foundation'] },
+    { id:'watch',      ar:'ساعة',        en:'watch',      mustHave:['watch','timepiece','chronograph','ساعة'], exclude:['bag','shoe','ring','sunglasses'] },
+    { id:'handbag',    ar:'حقيبة',       en:'handbag',    mustHave:['bag','handbag','purse','tote','clutch'], exclude:['watch','shoe','sunglasses'] },
+    { id:'sneakers',   ar:'حذاء رياضي',  en:'sneakers',   mustHave:['sneaker','shoe','trainer','حذاء'], exclude:['watch','bag','sunglasses'] },
+    { id:'foundation', ar:'كريم أساس',   en:'foundation', mustHave:['foundation','bb cream','cc cream'], exclude:['eyeshadow','lipstick','mascara'] },
   ],
   stats: { searches: 0, imageSearches: 0, cheaperRequests: 0, topSearches: [] },
 };
+
+// تحميل الإعدادات — من الملف إن وُجد، وإلا من الافتراضي
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_PATH)) {
+      const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
+      const saved = JSON.parse(raw);
+      // دمج الافتراضي مع المحفوظ للحفاظ على الحقول الجديدة
+      return {
+        ...DEFAULT_CONFIG,
+        ...saved,
+        stats: { ...DEFAULT_CONFIG.stats, ...(saved.stats || {}) },
+      };
+    }
+  } catch (e) {
+    console.error('Config load error:', e.message);
+  }
+  return { ...DEFAULT_CONFIG };
+}
+
+// حفظ الإعدادات في الملف
+function saveConfig(cfg) {
+  try {
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Config save error:', e.message);
+  }
+}
+
+// adminConfig يُحمّل من الملف عند بدء السيرفر
+let adminConfig = loadConfig();
+console.log(`📋 Config loaded — sources: [${adminConfig.sources.map(s=>(s.active?'✓':'✗')+s.name).join(', ')}]`);
 
 app.get('/api/admin/config', adminAuth, (req, res) => {
   res.json(adminConfig);
@@ -797,8 +958,9 @@ app.post('/api/admin/config', adminAuth, (req, res) => {
   if (sources)    adminConfig.sources    = sources;
   if (markets)    adminConfig.markets    = markets;
   if (categories) adminConfig.categories = categories;
-  console.log('✅ Admin config updated');
-  res.json({ ok: true, message: 'Config saved' });
+  saveConfig(adminConfig);  // ← يُحفظ في الملف فوراً
+  console.log(`✅ Config saved — active: [${adminConfig.sources.filter(s=>s.active).map(s=>s.name).join(', ')}]`);
+  res.json({ ok: true });
 });
 
 // ── Admin Stats ────────────────────────
