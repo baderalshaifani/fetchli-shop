@@ -210,56 +210,63 @@ Google Vision findings:
     ? 'User wants CHEAPER alternatives — use: dupe, budget, affordable, similar'
     : '';
 
+  // ── بناء context قوي من Vision و Lens ──
+  const visionHint = visionData ? `
+VISION AI DETECTED (trust this above all):
+- Physical objects in image: ${visionData.objects?.join(', ') || 'none'}
+- Labels: ${visionData.labels?.slice(0, 8).join(', ') || 'none'}
+- Brand logos: ${visionData.logos?.join(', ') || 'none'}
+- Best guess: ${visionData.bestGuess || 'none'}
+- Lens identified: ${visionData.lensType || 'none'}
+- Web entities: ${visionData.webEntities?.slice(0, 5).join(', ') || 'none'}
+- Colors: ${visionData.colors?.join(', ') || 'none'}
+` : '';
+
   content.push({
     type: 'text',
-    text: `You are an expert product identification AI.
+    text: `You are a physical product identification expert.
 
-${imageBase64 ? 'ANALYZE THE IMAGE with extreme precision. Identify EXACT product category, brand, model, visual attributes.' : ''}
-${visionContext}
-${message ? `User message: "${message}"` : ''}
+${visionHint}
+${message ? `User says: "${message}"` : ''}
 ${cheaperNote}
 
-CATEGORY IDENTIFICATION RULES (be exact):
-- Eye shadow palette/pan → category: "eyeshadow palette"
-- Lipstick/lip gloss → category: "lipstick"
-- Foundation/BB cream → category: "foundation"
-- Blush/bronzer → category: "blush"
-- Watch/timepiece → category: "watch"
-- Handbag/purse/tote → category: "handbag"
-- Sneakers/shoes → category: "sneakers"
-- Smartphone → category: "smartphone"
+## CRITICAL RULES:
+1. IGNORE any text/UI/website visible in the image background
+2. FOCUS ONLY on the physical product being shown/sold
+3. The Vision AI data above is your PRIMARY source — trust it
+4. If Vision says "shoe/sneaker/footwear" → category MUST be "sneakers"
+5. If Vision says "watch/timepiece" → category MUST be "watch"
+6. NEVER identify a product as software, OS, or website
 
-SEARCH QUERY CONSTRUCTION — 5 queries, SHORT (max 4 words each), same category:
-Q1: brand + category (e.g. "Tommy Hilfiger watch")
-Q2: brand + category + 1 key feature (e.g. "Tommy Hilfiger sport watch")
-Q3: category + color/style (e.g. "navy blue sport watch")
-Q4: brand + category + cheaper if needed (e.g. "Tommy Hilfiger watch affordable")
-Q5: category only — most general (e.g. "men sport watch")
+## PRODUCT CATEGORIES:
+- shoe/sneaker/boot/footwear → "sneakers"
+- watch/timepiece/smartwatch → "watch"  
+- bag/handbag/purse/tote → "handbag"
+- eyeshadow/palette/makeup → "eyeshadow palette"
+- lipstick/lip gloss → "lipstick"
+- phone/smartphone → "smartphone"
+- shirt/dress/clothing → "clothing"
+- furniture/cabinet/shelf → "furniture"
 
-RULES:
-- MAX 4 WORDS per query — Amazon/AliExpress fail with long queries
-- All queries same category
-- Never include more than 1 adjective per query
+## SEARCH QUERIES — 5 queries, MAX 4 WORDS each:
+Q1: brand + category (e.g. "Nike pink sneakers")
+Q2: category + main color (e.g. "pink women sneakers")  
+Q3: category + style (e.g. "casual pink shoes")
+Q4: brand + category variant (e.g. "Nike women shoes")
+Q5: category only (e.g. "women sneakers")
 
-Extract from image:
-- Exact brand (read any visible text/logo)
-- Product line/model name if visible
-- Color palette / shade names
-- Finish: matte/shimmer/glitter/satin/mixed
-- Packaging details
+ALL queries same category. Short = better results on Amazon/AliExpress.
 
-JSON only (no markdown):
+JSON only:
 {
-  "productType": "نوع المنتج بالعربي الدقيق",
-  "category": "exact English category",
-  "brand": "brand name or null",
-  "model": "model/line name or null",
-  "color": "color description",
-  "finish": "matte/shimmer/mixed/etc",
-  "details": "key visual features",
+  "productType": "نوع المنتج بالعربي",
+  "category": "english category",
+  "brand": "brand or null",
+  "color": "main color",
+  "details": "key features",
   "searchQueries": ["q1","q2","q3","q4","q5"],
-  "reply": "رد ودي قصير بالعربي يصف المنتج بدقة",
-  "confidence": 95
+  "reply": "رد قصير بالعربي يصف المنتج المادي فقط",
+  "confidence": 90
 }`,
   });
 
@@ -307,15 +314,36 @@ function buildFallbackFromVision(visionData, message, wantCheaper) {
   const allText = (guess + ' ' + (visionData.objects?.join(' ') || '') + ' ' + (visionData.labels?.slice(0,5).join(' ') || '')).toLowerCase();
 
   const productMap = {
-    'eyeshadow': { ar: 'باليت ظلال', en: 'eyeshadow palette' },
-    'palette':   { ar: 'باليت', en: 'palette' },
-    'lipstick':  { ar: 'أحمر شفاه', en: 'lipstick' },
-    'makeup':    { ar: 'مكياج', en: 'makeup' },
-    'watch':     { ar: 'ساعة', en: 'watch' },
-    'bag':       { ar: 'حقيبة', en: 'handbag' },
-    'handbag':   { ar: 'حقيبة', en: 'handbag' },
-    'shoe':      { ar: 'حذاء', en: 'sneakers' },
-    'phone':     { ar: 'جوال', en: 'smartphone' },
+    // أحذية
+    'shoe':       { ar: 'حذاء', en: 'sneakers' },
+    'sneaker':    { ar: 'حذاء رياضي', en: 'sneakers' },
+    'boot':       { ar: 'بوت', en: 'boots' },
+    'footwear':   { ar: 'حذاء', en: 'sneakers' },
+    'sandal':     { ar: 'صندل', en: 'sandals' },
+    'heel':       { ar: 'كعب', en: 'heels' },
+    // ساعات
+    'watch':      { ar: 'ساعة', en: 'watch' },
+    'timepiece':  { ar: 'ساعة', en: 'watch' },
+    'smartwatch': { ar: 'ساعة ذكية', en: 'smartwatch' },
+    // حقائب
+    'bag':        { ar: 'حقيبة', en: 'handbag' },
+    'handbag':    { ar: 'حقيبة', en: 'handbag' },
+    'purse':      { ar: 'حقيبة', en: 'handbag' },
+    'backpack':   { ar: 'حقيبة ظهر', en: 'backpack' },
+    // مكياج
+    'eyeshadow':  { ar: 'باليت ظلال', en: 'eyeshadow palette' },
+    'palette':    { ar: 'باليت', en: 'eyeshadow palette' },
+    'lipstick':   { ar: 'أحمر شفاه', en: 'lipstick' },
+    'makeup':     { ar: 'مكياج', en: 'makeup' },
+    'perfume':    { ar: 'عطر', en: 'perfume' },
+    // إلكترونيات
+    'phone':      { ar: 'جوال', en: 'smartphone' },
+    'laptop':     { ar: 'لابتوب', en: 'laptop' },
+    'headphone':  { ar: 'سماعة', en: 'headphones' },
+    // ملابس
+    'dress':      { ar: 'فستان', en: 'dress' },
+    'shirt':      { ar: 'قميص', en: 'shirt' },
+    'jacket':     { ar: 'جاكيت', en: 'jacket' },
   };
 
   let productType = 'منتج', category = 'product';
