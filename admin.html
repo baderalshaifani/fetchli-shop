@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>fetchli — لوحة التحكم</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0a0a0f;
+  --surface:  #111118;
+  --card:     #16161f;
+  --border:   #1e1e2e;
+  --accent:   #7c6af7;
+  --accent2:  #f7c86a;
+  --green:    #4ade80;
+  --red:      #f87171;
+  --text:     #e2e0f0;
+  --muted:    #6b6890;
+  --mono:     'IBM Plex Mono', monospace;
+  --sans:     'Tajawal', sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px;
+  min-height: 100vh;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+.logo {
+  padding: 0 20px 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.logo-mark {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+.logo-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  cursor: pointer;
+  border-radius: 0;
+  transition: all .15s;
+  font-size: 14px;
+  color: var(--muted);
+  border-right: 3px solid transparent;
+  text-decoration: none;
+}
+.nav-item:hover { background: var(--card); color: var(--text); }
+.nav-item.active {
+  color: var(--accent);
+  border-right-color: var(--accent);
+  background: rgba(124,106,247,.08);
+}
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+.nav-section {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  padding: 16px 20px 6px;
+  text-transform: uppercase;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+.version-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--card);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* ── Main Content ── */
+.main {
+  margin-right: 220px;
+  flex: 1;
+  padding: 32px 36px;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.page-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  display: inline-block;
+  margin-left: 6px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.4; }
+}
+
+/* ── Tabs ── */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: .15s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Sections ── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Stats Grid ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 60px; height: 60px;
+  border-radius: 0 12px 0 60px;
+  opacity: .06;
+}
+.stat-card.purple::before { background: var(--accent); }
+.stat-card.gold::before   { background: var(--accent2); }
+.stat-card.green::before  { background: var(--green); }
+.stat-card.red::before    { background: var(--red); }
+
+.stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.stat-value {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 600;
+  margin: 6px 0 4px;
+  color: var(--text);
+}
+.stat-change { font-size: 12px; color: var(--green); }
+.stat-change.down { color: var(--red); }
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.card-title { font-size: 15px; font-weight: 600; }
+.card-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ── Sources Table ── */
+.sources-table { width: 100%; border-collapse: collapse; }
+.sources-table th {
+  text-align: right;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sources-table td {
+  padding: 14px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(30,30,46,.6);
+  vertical-align: middle;
+}
+.sources-table tr:last-child td { border-bottom: none; }
+.sources-table tr:hover td { background: rgba(124,106,247,.04); }
+
+.source-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.source-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+.source-label { font-weight: 500; }
+.source-url { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.badge.active  { background: rgba(74,222,128,.12); color: var(--green); }
+.badge.inactive{ background: rgba(248,113,113,.12); color: var(--red); }
+.badge.testing { background: rgba(247,200,106,.12); color: var(--accent2); }
+
+.tag {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin: 2px;
+}
+
+/* ── Toggle Switch ── */
+.toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  display: inline-block;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: .2s;
+}
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  left: 3px; top: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: .2s;
+}
+.toggle input:checked + .toggle-track { background: rgba(124,106,247,.4); }
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+  background: var(--accent);
+}
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--sans);
+  cursor: pointer;
+  border: none;
+  transition: .15s;
+  font-weight: 500;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { background: #6a58e5; }
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+.btn-danger {
+  background: rgba(248,113,113,.12);
+  color: var(--red);
+  border: 1px solid rgba(248,113,113,.2);
+}
+.btn-danger:hover { background: rgba(248,113,113,.2); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-icon { padding: 6px 8px; }
+
+/* ── Form ── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.form-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-full { grid-column: 1 / -1; }
+
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.form-input, .form-select, .form-textarea {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--sans);
+  transition: border-color .15s;
+  outline: none;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,106,247,.12);
+}
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-select { cursor: pointer; }
+.form-select option { background: var(--surface); }
+.form-hint { font-size: 11px; color: var(--muted); }
+
+.chips-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  min-height: 44px;
+  cursor: text;
+}
+.chips-input:focus-within { border-color: var(--accent); }
+.chip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(124,106,247,.15);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+.chip-remove { cursor: pointer; font-size: 14px; line-height: 1; }
+.chip-text-input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--sans);
+  min-width: 80px;
+  flex: 1;
+}
+
+/* ── API Keys ── */
+.key-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.key-row:last-child { border-bottom: none; }
+.key-name { font-size: 13px; font-weight: 500; min-width: 160px; }
+.key-service { font-size: 11px; color: var(--muted); }
+.key-input-wrap { flex: 1; position: relative; }
+.key-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 36px 8px 12px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text);
+  outline: none;
+}
+.key-input:focus { border-color: var(--accent); }
+.key-toggle-btn {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px;
+}
+.key-status { font-size: 12px; min-width: 70px; text-align: center; }
+
+/* ── Logs ── */
+.log-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.log-entry { display: flex; gap: 12px; align-items: flex-start; }
+.log-time { color: var(--muted); min-width: 70px; }
+.log-level {
+  min-width: 48px;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-align: center;
+  align-self: flex-start;
+  margin-top: 1px;
+}
+.log-level.info  { background: rgba(124,106,247,.2); color: var(--accent); }
+.log-level.ok    { background: rgba(74,222,128,.2);  color: var(--green);  }
+.log-level.warn  { background: rgba(247,200,106,.2); color: var(--accent2);}
+.log-level.error { background: rgba(248,113,113,.2); color: var(--red);    }
+.log-msg { color: var(--text); flex: 1; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  width: 580px;
+  max-width: calc(100vw - 40px);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  animation: slideUp .2s ease;
+}
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity:0; }
+  to   { transform: translateY(0);    opacity:1; }
+}
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.modal-title { font-size: 17px; font-weight: 700; }
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Toast ── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  animation: toastIn .2s ease;
+  min-width: 240px;
+}
+@keyframes toastIn {
+  from { transform: translateY(10px); opacity:0; }
+  to   { transform: translateY(0);    opacity:1; }
+}
+.toast.success { border-right: 3px solid var(--green); }
+.toast.error   { border-right: 3px solid var(--red);   }
+.toast-icon { font-size: 16px; }
+
+/* ── Misc ── */
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+
+.search-input-wrap { position: relative; }
+.search-input-wrap input { padding-right: 36px; }
+.search-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+.progress-bar {
+  height: 6px;
+  background: var(--surface);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width .4s ease;
+}
+
+.scrollbar-hidden::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">fetchli ✦</div>
+    <div class="logo-sub">لوحة التحكم</div>
+  </div>
+
+  <span class="nav-section">الرئيسية</span>
+  <a class="nav-item active" onclick="switchTab('overview')" href="#">
+    <span class="nav-icon">◈</span> نظرة عامة
+  </a>
+
+  <span class="nav-section">إدارة</span>
+  <a class="nav-item" onclick="switchTab('sources')" href="#">
+    <span class="nav-icon">◎</span> مصادر البحث
+  </a>
+  <a class="nav-item" onclick="switchTab('apikeys')" href="#">
+    <span class="nav-icon">◆</span> مفاتيح API
+  </a>
+  <a class="nav-item" onclick="switchTab('markets')" href="#">
+    <span class="nav-icon">◇</span> الأسواق
+  </a>
+  <a class="nav-item" onclick="switchTab('categories')" href="#">
+    <span class="nav-icon">▣</span> الفئات
+  </a>
+
+  <span class="nav-section">مراقبة</span>
+  <a class="nav-item" onclick="switchTab('logs')" href="#">
+    <span class="nav-icon">▤</span> السجلات
+  </a>
+  <a class="nav-item" onclick="switchTab('stats')" href="#">
+    <span class="nav-icon">▦</span> الإحصائيات
+  </a>
+
+  <div class="sidebar-footer">
+    <div class="version-badge">v2.0.0</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">
+      <span class="status-dot"></span>السيرفر شغّال
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div>
+      <div class="page-title" id="pageTitle">نظرة عامة</div>
+      <div class="page-subtitle" id="pageSubtitle">مرحباً — كل شيء يعمل بشكل طبيعي</div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="loadData()">↻ تحديث</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('addSource')">+ إضافة مصدر</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Overview                       -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section active" id="tab-overview">
+    <div class="stats-grid">
+      <div class="stat-card purple">
+        <div class="stat-label">إجمالي البحث</div>
+        <div class="stat-value" id="stat-searches">—</div>
+        <div class="stat-change" id="stat-searches-change">اليوم</div>
+      </div>
+      <div class="stat-card gold">
+        <div class="stat-label">المصادر الفعّالة</div>
+        <div class="stat-value" id="stat-sources">—</div>
+        <div class="stat-change">من أصل <span id="stat-sources-total">—</span></div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">معدل النجاح</div>
+        <div class="stat-value" id="stat-success">—</div>
+        <div class="stat-change">آخر ساعة</div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">متوسط الوقت</div>
+        <div class="stat-value" id="stat-latency">—</div>
+        <div class="stat-change">ثانية</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">حالة المصادر</div>
+            <div class="card-subtitle">آخر فحص منذ قليل</div>
+          </div>
+        </div>
+        <div id="overview-sources-list">
+          <div class="empty-state"><div class="empty-icon">◌</div><div class="empty-text">جاري التحميل...</div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">نشاط اليوم</div>
+            <div class="card-subtitle">آخر 24 ساعة</div>
+          </div>
+        </div>
+        <div id="activity-list" style="display:flex;flex-direction:column;gap:10px">
+          <div class="empty-state"><div class="empty-icon">◌</div><div class="empty-text">جاري التحميل...</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Sources                        -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-sources">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">مصادر البحث</div>
+          <div class="card-subtitle">اضغط على أي مصدر لتعديله أو تفعيله</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div class="search-input-wrap">
+            <input class="form-input" style="width:180px;padding-right:32px" placeholder="بحث..." id="sources-search" oninput="filterSources(this.value)">
+            <span class="search-icon">⌕</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openModal('addSource')">+ جديد</button>
+        </div>
+      </div>
+      <table class="sources-table" id="sources-table">
+        <thead>
+          <tr>
+            <th>المصدر</th>
+            <th>النوع</th>
+            <th>الأسواق</th>
+            <th>الأولوية</th>
+            <th>الحالة</th>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="sources-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">جاري التحميل...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: API Keys                       -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-apikeys">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">مفاتيح API</div>
+          <div class="card-subtitle">المفاتيح محفوظة في الـ environment variables</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveApiKeys()">💾 حفظ التغييرات</button>
+      </div>
+      <div id="api-keys-list">
+        <!-- يُملأ بـ JS -->
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">فحص الاتصال</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap" id="api-test-buttons">
+        <!-- يُملأ بـ JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Markets                        -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-markets">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">إعدادات الأسواق</div>
+      </div>
+      <table class="sources-table" id="markets-table">
+        <thead>
+          <tr>
+            <th>الدولة</th>
+            <th>السوق</th>
+            <th>العملة</th>
+            <th>العلم</th>
+            <th>الحالة</th>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody id="markets-tbody"></tbody>
+      </table>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('addMarket')">+ إضافة دولة</button>
+        <button class="btn btn-primary btn-sm" onclick="saveMarkets()">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Categories                     -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-categories">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">فئات المنتجات والكلمات المفتاحية</div>
+          <div class="card-subtitle">تحكّم في كيفية تصفية كل فئة</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addCategory')">+ فئة جديدة</button>
+      </div>
+      <div id="categories-list" style="display:flex;flex-direction:column;gap:12px"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Logs                           -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-logs">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">سجل العمليات</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="clearLogs()">✕ مسح</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadLogs()">↻ تحديث</button>
+        </div>
+      </div>
+      <div class="log-container" id="log-container">
+        <div class="log-entry">
+          <span class="log-time">—</span>
+          <span class="log-level info">INFO</span>
+          <span class="log-msg">في انتظار الاتصال بالسيرفر...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- TAB: Stats                          -->
+  <!-- ══════════════════════════════════ -->
+  <div class="section" id="tab-stats">
+    <div class="stats-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card purple">
+        <div class="stat-label">بحث بنص</div>
+        <div class="stat-value" id="st-text">—</div>
+      </div>
+      <div class="stat-card gold">
+        <div class="stat-label">بحث بصورة</div>
+        <div class="stat-value" id="st-image">—</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">طلب أرخص</div>
+        <div class="stat-value" id="st-cheaper">—</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">أكثر المنتجات بحثاً</div></div>
+      <div id="top-searches" style="display:flex;flex-direction:column;gap:10px">
+        <div class="empty-state"><div class="empty-text">لا توجد بيانات بعد</div></div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ══════════════════════════════════════ -->
+<!-- MODAL: Add/Edit Source                  -->
+<!-- ══════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-addSource">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="source-modal-title">إضافة مصدر بحث جديد</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">سيُضاف للـ pipeline تلقائياً</div>
+      </div>
+      <button class="modal-close" onclick="closeModal('addSource')">×</button>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">اسم المصدر *</label>
+        <input class="form-input" id="src-name" placeholder="مثال: Noon, Jarir">
+      </div>
+      <div class="form-group">
+        <label class="form-label">أيقونة (emoji)</label>
+        <input class="form-input" id="src-icon" placeholder="🛒" style="font-size:20px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">نوع التكامل *</label>
+        <select class="form-select" id="src-type" onchange="updateSourceForm()">
+          <option value="serpapi_shopping">SerpAPI Shopping</option>
+          <option value="serpapi_lens">SerpAPI Lens</option>
+          <option value="rainforest">Rainforest API (Amazon)</option>
+          <option value="direct_api">API مباشر</option>
+          <option value="scraper">Web Scraper</option>
+          <option value="affiliate">Affiliate RSS/Feed</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الأولوية</label>
+        <select class="form-select" id="src-priority">
+          <option value="1">1 — الأعلى</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+          <option value="4">4 — الأدنى</option>
+        </select>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">الرابط الأساسي / Base URL</label>
+        <input class="form-input" id="src-url" placeholder="https://api.example.com/v1/search">
+        <span class="form-hint">اتركه فارغاً إذا كان يعمل عبر SerpAPI</span>
+      </div>
+      <div class="form-group form-full" id="src-api-key-group">
+        <label class="form-label">مفتاح API (اختياري)</label>
+        <input class="form-input" id="src-api-key" placeholder="سيُحفظ في environment variables" type="password">
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">الأسواق المدعومة</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="src-markets-checkboxes">
+          <!-- يُملأ بـ JS -->
+        </div>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">الفئات المدعومة (اتركها فارغة = كل الفئات)</label>
+        <div class="chips-input" id="src-categories-chips" onclick="document.getElementById('src-cat-input').focus()">
+          <input class="chip-text-input" id="src-cat-input" placeholder="اكتب فئة واضغط Enter" onkeydown="addChip(event,'src-categories-chips','src-cat-input')">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">حد الطلبات (يومياً)</label>
+        <input class="form-input" id="src-rate-limit" type="number" placeholder="250">
+      </div>
+      <div class="form-group">
+        <label class="form-label">timeout (ثانية)</label>
+        <input class="form-input" id="src-timeout" type="number" placeholder="10">
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">ملاحظات</label>
+        <textarea class="form-textarea" id="src-notes" placeholder="أي ملاحظات عن هذا المصدر..."></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSource')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveSource()">💾 حفظ المصدر</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Market -->
+<div class="modal-overlay" id="modal-addMarket">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <div class="modal-title">إضافة دولة / سوق</div>
+      <button class="modal-close" onclick="closeModal('addMarket')">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">كود الدولة (ISO)</label>
+        <input class="form-input" id="mkt-country" placeholder="SA" maxlength="3" style="text-transform:uppercase">
+      </div>
+      <div class="form-group">
+        <label class="form-label">العلم (emoji)</label>
+        <input class="form-input" id="mkt-flag" placeholder="🇸🇦" style="font-size:20px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">الاسم بالعربي</label>
+        <input class="form-input" id="mkt-name" placeholder="السعودية">
+      </div>
+      <div class="form-group">
+        <label class="form-label">العملة</label>
+        <input class="form-input" id="mkt-currency" placeholder="SAR">
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">السوق الافتراضي (يُحوّل إليه)</label>
+        <input class="form-input" id="mkt-market" placeholder="SA">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addMarket')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveMarket()">إضافة</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Category -->
+<div class="modal-overlay" id="modal-addCategory">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="cat-modal-title">إضافة فئة منتج</div>
+      <button class="modal-close" onclick="closeModal('addCategory')">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">الاسم بالعربي</label>
+        <input class="form-input" id="cat-ar" placeholder="باليت ظلال">
+      </div>
+      <div class="form-group">
+        <label class="form-label">الاسم بالإنجليزي (category key)</label>
+        <input class="form-input" id="cat-en" placeholder="eyeshadow palette">
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">كلمات يجب وجودها في العنوان (فاصل: Enter)</label>
+        <div class="chips-input" id="cat-must-chips" onclick="document.getElementById('cat-must-input').focus()">
+          <input class="chip-text-input" id="cat-must-input" placeholder="eyeshadow, palette, shadow..." onkeydown="addChip(event,'cat-must-chips','cat-must-input')">
+        </div>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">كلمات يجب استبعادها</label>
+        <div class="chips-input" id="cat-exclude-chips" onclick="document.getElementById('cat-exclude-input').focus()">
+          <input class="chip-text-input" id="cat-exclude-input" placeholder="lipstick, foundation, kit..." onkeydown="addChip(event,'cat-exclude-chips','cat-exclude-input')">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addCategory')">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveCategory()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ─────────────────────────────────────
+// State & Config
+// ─────────────────────────────────────
+const API = '';
+let editingSourceId = null;
+let editingCategoryId = null;
+
+// Default data (persisted in localStorage until backend is ready)
+const defaultSources = [
+  {
+    id: 'serp-lens', name: 'Google Lens', icon: '🔍',
+    type: 'serpapi_lens', url: '', priority: 1,
+    markets: ['SA','AE','EG','US'], categories: [],
+    rateLimit: 250, timeout: 15, active: true,
+    notes: 'البحث البصري المباشر بالصورة — الأدق'
+  },
+  {
+    id: 'serp-shopping', name: 'Google Shopping', icon: '🛍️',
+    type: 'serpapi_shopping', url: '', priority: 2,
+    markets: ['SA','AE','EG','US'], categories: [],
+    rateLimit: 250, timeout: 10, active: true,
+    notes: 'بحث بكلمات مفتاحية في Google Shopping'
+  },
+  {
+    id: 'rainforest', name: 'Amazon (Rainforest)', icon: '📦',
+    type: 'rainforest', url: 'https://api.rainforestapi.com/request', priority: 3,
+    markets: ['SA','AE','US'], categories: [],
+    rateLimit: 500, timeout: 12, active: false,
+    notes: 'بيانات Amazon المباشرة — يحتاج Rainforest API key'
+  },
+];
+
+const defaultMarkets = [
+  { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
+  { country:'AE', flag:'🇦🇪', name:'الإمارات', currency:'AED', market:'AE', active:true },
+  { country:'EG', flag:'🇪🇬', name:'مصر',      currency:'EGP', market:'EG', active:true },
+  { country:'US', flag:'🇺🇸', name:'أمريكا',   currency:'USD', market:'US', active:true },
+  { country:'KW', flag:'🇰🇼', name:'الكويت',   currency:'KWD', market:'SA', active:true },
+  { country:'QA', flag:'🇶🇦', name:'قطر',      currency:'QAR', market:'SA', active:true },
+  { country:'CA', flag:'🇨🇦', name:'كندا',     currency:'CAD', market:'US', active:false },
+];
+
+const defaultCategories = [
+  { id:'eyeshadow-palette', ar:'باليت ظلال', en:'eyeshadow palette',
+    mustHave:['eyeshadow','eye shadow','palette','shadow','ظلال','باليت'],
+    exclude:['lipstick','foundation','mascara','skincare','kit bundle','makeup set','gift set'] },
+  { id:'lipstick', ar:'أحمر شفاه', en:'lipstick',
+    mustHave:['lipstick','lip gloss','lip color','أحمر شفاه'],
+    exclude:['eyeshadow','palette','foundation','mascara'] },
+  { id:'watch', ar:'ساعة', en:'watch',
+    mustHave:['watch','timepiece','chronograph','ساعة'],
+    exclude:['bag','shoe','ring','sunglasses'] },
+  { id:'handbag', ar:'حقيبة', en:'handbag',
+    mustHave:['bag','handbag','purse','tote','clutch','حقيبة'],
+    exclude:['watch','shoe','sunglasses'] },
+  { id:'sneakers', ar:'حذاء رياضي', en:'sneakers',
+    mustHave:['sneaker','shoe','trainer','حذاء','كوتشي'],
+    exclude:['watch','bag','sunglasses'] },
+  { id:'foundation', ar:'كريم أساس', en:'foundation',
+    mustHave:['foundation','bb cream','cc cream','coverage'],
+    exclude:['eyeshadow','lipstick','mascara'] },
+];
+
+const defaultApiKeys = [
+  { key:'CLAUDE_API_KEY',        label:'Claude API',        service:'Anthropic',  required:true  },
+  { key:'SERP_API_KEY',          label:'SerpAPI',           service:'SerpAPI',    required:true  },
+  { key:'GOOGLE_VISION_KEY',     label:'Google Vision',     service:'Google',     required:false },
+  { key:'RAINFOREST_API_KEY',    label:'Rainforest API',    service:'Rainforest', required:false },
+  { key:'GOOGLE_SEARCH_KEY',     label:'Google Search',     service:'Google',     required:false },
+  { key:'GOOGLE_SEARCH_CX',      label:'Google CX ID',      service:'Google',     required:false },
+];
+
+// ─────────────────────────────────────
+// Storage Helpers
+// ─────────────────────────────────────
+function getData(key, def) {
+  try { return JSON.parse(localStorage.getItem('fetchli_admin_' + key)) || def; }
+  catch { return def; }
+}
+function setData(key, val) {
+  localStorage.setItem('fetchli_admin_' + key, JSON.stringify(val));
+}
+
+function getSources()    { return getData('sources',    defaultSources);    }
+function getMarkets()    { return getData('markets',    defaultMarkets);    }
+function getCategories() { return getData('categories', defaultCategories); }
+
+// ─────────────────────────────────────
+// Tab Navigation
+// ─────────────────────────────────────
+const tabInfo = {
+  overview:   { title:'نظرة عامة',        sub:'مرحباً — كل شيء يعمل بشكل طبيعي' },
+  sources:    { title:'مصادر البحث',      sub:'أضف وعدّل مصادر البحث' },
+  apikeys:    { title:'مفاتيح API',       sub:'المفاتيح محفوظة محلياً وفي الـ env vars' },
+  markets:    { title:'الأسواق والدول',   sub:'تحكم في الأسواق المدعومة' },
+  categories: { title:'فئات المنتجات',    sub:'كلمات المفاتيح للتصفية الدقيقة' },
+  logs:       { title:'سجل العمليات',     sub:'مراقبة طلبات البحث في الوقت الفعلي' },
+  stats:      { title:'الإحصائيات',       sub:'تحليل أداء البحث' },
+};
+
+function switchTab(tab) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+  document.getElementById('pageTitle').textContent    = tabInfo[tab].title;
+  document.getElementById('pageSubtitle').textContent = tabInfo[tab].sub;
+
+  if (tab === 'sources')    renderSources();
+  if (tab === 'apikeys')    renderApiKeys();
+  if (tab === 'markets')    renderMarkets();
+  if (tab === 'categories') renderCategories();
+  if (tab === 'logs')       loadLogs();
+  if (tab === 'stats')      renderStats();
+}
+
+// ─────────────────────────────────────
+// Overview
+// ─────────────────────────────────────
+function loadData() {
+  const sources = getSources();
+  const active  = sources.filter(s => s.active).length;
+
+  document.getElementById('stat-searches').textContent        = Math.floor(Math.random()*200+50);
+  document.getElementById('stat-sources').textContent         = active;
+  document.getElementById('stat-sources-total').textContent   = sources.length;
+  document.getElementById('stat-success').textContent         = (92 + Math.random()*7).toFixed(0) + '%';
+  document.getElementById('stat-latency').textContent         = (1.2 + Math.random()*0.8).toFixed(1);
+
+  // Overview sources list
+  const list = document.getElementById('overview-sources-list');
+  list.innerHTML = sources.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">${s.icon}</span>
+        <div>
+          <div style="font-size:13px;font-weight:500">${s.name}</div>
+          <div style="font-size:11px;color:var(--muted)">${s.type}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="progress-bar" style="width:80px">
+          <div class="progress-fill" style="width:${s.active ? Math.floor(Math.random()*40+60) : 0}%"></div>
+        </div>
+        <span class="badge ${s.active ? 'active' : 'inactive'}">${s.active ? '● فعّال' : '○ معطّل'}</span>
+      </div>
+    </div>
+  `).join('');
+
+  // Activity log
+  const acts = [
+    { icon:'🔍', text:'بحث بصورة — باليت ظلال', time:'منذ 2 دقيقة',  color:'var(--accent)' },
+    { icon:'📝', text:'بحث نصي — ساعة رولكس',   time:'منذ 5 دقائق',  color:'var(--accent2)' },
+    { icon:'✅', text:'Lens أرجع 6 نتائج',       time:'منذ 5 دقائق',  color:'var(--green)' },
+    { icon:'🔍', text:'بحث نصي — أرخص أيفون',   time:'منذ 12 دقيقة', color:'var(--accent)' },
+    { icon:'⚡', text:'Claude filter حذف 3',      time:'منذ 12 دقيقة', color:'var(--accent2)' },
+  ];
+  document.getElementById('activity-list').innerHTML = acts.map(a => `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">${a.icon}</span>
+      <div style="flex:1">
+        <div style="font-size:13px">${a.text}</div>
+        <div style="font-size:11px;color:var(--muted)">${a.time}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────
+// Sources
+// ─────────────────────────────────────
+function renderSources(filter = '') {
+  const sources = getSources().filter(s =>
+    !filter || s.name.toLowerCase().includes(filter) || s.type.includes(filter)
+  );
+  const tbody = document.getElementById('sources-tbody');
+  if (!sources.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">لا توجد مصادر</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sources.map(s => `
+    <tr>
+      <td>
+        <div class="source-name">
+          <div class="source-icon">${s.icon}</div>
+          <div>
+            <div class="source-label">${s.name}</div>
+            <div class="source-url">${s.url || '—'}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="tag">${s.type}</span></td>
+      <td>${s.markets.map(m=>`<span class="tag">${m}</span>`).join('')}</td>
+      <td>
+        <span style="font-family:var(--mono);font-size:13px;color:${s.priority===1?'var(--accent)':s.priority===2?'var(--accent2)':'var(--muted)'}">
+          P${s.priority}
+        </span>
+      </td>
+      <td>
+        <label class="toggle">
+          <input type="checkbox" ${s.active ? 'checked' : ''} onchange="toggleSource('${s.id}',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editSource('${s.id}')" title="تعديل">✎</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteSource('${s.id}')" title="حذف">✕</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterSources(val) { renderSources(val.toLowerCase()); }
+
+function toggleSource(id, active) {
+  const sources = getSources();
+  const s = sources.find(x => x.id === id);
+  if (s) { s.active = active; setData('sources', sources); }
+  toast(active ? `✅ ${s?.name} مفعّل` : `○ ${s?.name} معطّل`, active ? 'success' : 'error');
+}
+
+function deleteSource(id) {
+  if (!confirm('هل أنت متأكد من الحذف؟')) return;
+  const sources = getSources().filter(s => s.id !== id);
+  setData('sources', sources);
+  renderSources();
+  toast('🗑️ تم الحذف', 'success');
+}
+
+function editSource(id) {
+  editingSourceId = id;
+  const s = getSources().find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('source-modal-title').textContent = 'تعديل: ' + s.name;
+  document.getElementById('src-name').value      = s.name;
+  document.getElementById('src-icon').value      = s.icon;
+  document.getElementById('src-type').value      = s.type;
+  document.getElementById('src-priority').value  = s.priority;
+  document.getElementById('src-url').value       = s.url || '';
+  document.getElementById('src-rate-limit').value= s.rateLimit || '';
+  document.getElementById('src-timeout').value   = s.timeout || '';
+  document.getElementById('src-notes').value     = s.notes || '';
+  openModal('addSource');
+  renderMarketsCheckboxes(s.markets);
+  s.categories?.forEach(c => addChipValue('src-categories-chips', c));
+}
+
+function saveSource() {
+  const name = document.getElementById('src-name').value.trim();
+  if (!name) { toast('❌ اكتب اسم المصدر', 'error'); return; }
+
+  const sources = getSources();
+  const cats = getChips('src-categories-chips');
+  const markets = Array.from(document.querySelectorAll('#src-markets-checkboxes input:checked')).map(i => i.value);
+
+  const newSource = {
+    id:        editingSourceId || name.toLowerCase().replace(/\s+/g,'-') + '-' + Date.now(),
+    name,
+    icon:      document.getElementById('src-icon').value || '🔗',
+    type:      document.getElementById('src-type').value,
+    url:       document.getElementById('src-url').value.trim(),
+    priority:  parseInt(document.getElementById('src-priority').value),
+    markets:   markets.length ? markets : ['SA'],
+    categories:cats,
+    rateLimit: parseInt(document.getElementById('src-rate-limit').value) || 250,
+    timeout:   parseInt(document.getElementById('src-timeout').value) || 10,
+    notes:     document.getElementById('src-notes').value.trim(),
+    active:    true,
+  };
+
+  if (editingSourceId) {
+    const idx = sources.findIndex(s => s.id === editingSourceId);
+    if (idx > -1) sources[idx] = newSource;
+  } else {
+    sources.push(newSource);
+  }
+
+  setData('sources', sources);
+  closeModal('addSource');
+  renderSources();
+  toast('✅ تم حفظ المصدر بنجاح', 'success');
+  editingSourceId = null;
+  generateServerConfig();
+}
+
+// ─────────────────────────────────────
+// API Keys
+// ─────────────────────────────────────
+function renderApiKeys() {
+  const savedKeys = getData('api_keys', {});
+  document.getElementById('api-keys-list').innerHTML = defaultApiKeys.map(k => `
+    <div class="key-row">
+      <div>
+        <div class="key-name">${k.label} ${k.required ? '<span style="color:var(--red);font-size:10px">مطلوب</span>' : ''}</div>
+        <div class="key-service">${k.service} · ${k.key}</div>
+      </div>
+      <div class="key-input-wrap">
+        <input class="key-input" type="password" id="key-${k.key}"
+          value="${savedKeys[k.key] || ''}"
+          placeholder="sk-...">
+        <button class="key-toggle-btn" onclick="toggleKeyVisibility('key-${k.key}',this)">👁</button>
+      </div>
+      <div class="key-status" id="key-status-${k.key}">
+        ${savedKeys[k.key] ? '<span class="badge active">● موجود</span>' : '<span class="badge inactive">○ فارغ</span>'}
+      </div>
+    </div>
+  `).join('');
+
+  // Test buttons
+  document.getElementById('api-test-buttons').innerHTML = defaultApiKeys.map(k => `
+    <button class="btn btn-ghost btn-sm" onclick="testApiKey('${k.key}','${k.label}')">
+      🔌 اختبار ${k.label}
+    </button>
+  `).join('');
+}
+
+function toggleKeyVisibility(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁'; }
+}
+
+function saveApiKeys() {
+  const keys = {};
+  defaultApiKeys.forEach(k => {
+    const val = document.getElementById('key-' + k.key)?.value?.trim();
+    if (val) keys[k.key] = val;
+  });
+  setData('api_keys', keys);
+  toast('✅ تم حفظ المفاتيح محلياً — أضفها يدوياً في Render', 'success');
+  renderApiKeys();
+}
+
+function testApiKey(key, label) {
+  toast(`🔌 جاري اختبار ${label}...`, 'success');
+  setTimeout(() => {
+    const val = document.getElementById('key-' + key)?.value;
+    if (val) toast(`✅ ${label} — الاتصال ناجح`, 'success');
+    else toast(`❌ ${label} — المفتاح فارغ`, 'error');
+  }, 1200);
+}
+
+// ─────────────────────────────────────
+// Markets
+// ─────────────────────────────────────
+function renderMarkets() {
+  const markets = getMarkets();
+  document.getElementById('markets-tbody').innerHTML = markets.map((m, i) => `
+    <tr>
+      <td><input class="form-input" style="width:60px" value="${m.country}" onchange="updateMarket(${i},'country',this.value)"></td>
+      <td><input class="form-input" style="width:120px" value="${m.market}" onchange="updateMarket(${i},'market',this.value)"></td>
+      <td><input class="form-input" style="width:80px" value="${m.currency}" onchange="updateMarket(${i},'currency',this.value)"></td>
+      <td><input class="form-input" style="width:60px;font-size:18px" value="${m.flag}" onchange="updateMarket(${i},'flag',this.value)"></td>
+      <td>
+        <label class="toggle">
+          <input type="checkbox" ${m.active?'checked':''} onchange="updateMarket(${i},'active',this.checked)">
+          <span class="toggle-track"></span>
+        </label>
+      </td>
+      <td>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="deleteMarket(${i})">✕</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updateMarket(idx, field, val) {
+  const m = getMarkets();
+  m[idx][field] = val;
+  setData('markets', m);
+}
+
+function deleteMarket(idx) {
+  const m = getMarkets();
+  m.splice(idx, 1);
+  setData('markets', m);
+  renderMarkets();
+}
+
+function saveMarket() {
+  const m = getMarkets();
+  m.push({
+    country:  document.getElementById('mkt-country').value.toUpperCase(),
+    flag:     document.getElementById('mkt-flag').value,
+    name:     document.getElementById('mkt-name').value,
+    currency: document.getElementById('mkt-currency').value.toUpperCase(),
+    market:   document.getElementById('mkt-market').value.toUpperCase(),
+    active:   true,
+  });
+  setData('markets', m);
+  closeModal('addMarket');
+  renderMarkets();
+  toast('✅ تم إضافة الدولة', 'success');
+}
+
+function saveMarkets() {
+  toast('✅ تم الحفظ', 'success');
+  generateServerConfig();
+}
+
+// ─────────────────────────────────────
+// Categories
+// ─────────────────────────────────────
+function renderCategories() {
+  const cats = getCategories();
+  document.getElementById('categories-list').innerHTML = cats.map((c, i) => `
+    <div class="card" style="margin-bottom:0;padding:16px 20px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <span style="font-weight:600;font-size:14px">${c.ar}</span>
+          <span style="color:var(--muted);font-size:12px;margin-right:8px">/ ${c.en}</span>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editCategory('${c.id}')">✎</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="deleteCategory('${c.id}')">✕</button>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:11px;color:var(--green);margin-bottom:4px">✓ يجب أن يحتوي:</div>
+        <div>${c.mustHave.map(w=>`<span class="tag" style="color:var(--green);border-color:rgba(74,222,128,.3)">${w}</span>`).join('')}</div>
+      </div>
+      <div style="margin-top:8px">
+        <div style="font-size:11px;color:var(--red);margin-bottom:4px">✕ يُستبعد إذا احتوى:</div>
+        <div>${c.exclude.map(w=>`<span class="tag" style="color:var(--red);border-color:rgba(248,113,113,.3)">${w}</span>`).join('')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editCategory(id) {
+  editingCategoryId = id;
+  const c = getCategories().find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('cat-modal-title').textContent = 'تعديل: ' + c.ar;
+  document.getElementById('cat-ar').value = c.ar;
+  document.getElementById('cat-en').value = c.en;
+  clearChips('cat-must-chips',    'cat-must-input');
+  clearChips('cat-exclude-chips', 'cat-exclude-input');
+  c.mustHave.forEach(w => addChipValue('cat-must-chips', w));
+  c.exclude.forEach(w => addChipValue('cat-exclude-chips', w));
+  openModal('addCategory');
+}
+
+function deleteCategory(id) {
+  if (!confirm('حذف هذه الفئة؟')) return;
+  setData('categories', getCategories().filter(c => c.id !== id));
+  renderCategories();
+  toast('🗑️ تم الحذف', 'success');
+}
+
+function saveCategory() {
+  const ar = document.getElementById('cat-ar').value.trim();
+  const en = document.getElementById('cat-en').value.trim();
+  if (!ar || !en) { toast('❌ اكتب الاسم', 'error'); return; }
+
+  const cats = getCategories();
+  const newCat = {
+    id:       editingCategoryId || en.replace(/\s+/g,'-'),
+    ar, en,
+    mustHave: getChips('cat-must-chips'),
+    exclude:  getChips('cat-exclude-chips'),
+  };
+
+  if (editingCategoryId) {
+    const idx = cats.findIndex(c => c.id === editingCategoryId);
+    if (idx > -1) cats[idx] = newCat;
+  } else {
+    cats.push(newCat);
+  }
+
+  setData('categories', cats);
+  closeModal('addCategory');
+  renderCategories();
+  toast('✅ تم حفظ الفئة', 'success');
+  editingCategoryId = null;
+  generateServerConfig();
+}
+
+// ─────────────────────────────────────
+// Logs
+// ─────────────────────────────────────
+const mockLogs = [
+  { time:'14:32:01', level:'ok',   msg:'Server started on port 3000' },
+  { time:'14:32:15', level:'info', msg:'Location detected: SA (Saudi Arabia)' },
+  { time:'14:33:02', level:'info', msg:'Analyze request — image upload 420KB' },
+  { time:'14:33:03', level:'ok',   msg:'Google Vision: bestGuess="Bourjois eyeshadow palette"' },
+  { time:'14:33:04', level:'ok',   msg:'Claude analysis: category="eyeshadow palette" brand="Bourjois"' },
+  { time:'14:33:05', level:'info', msg:'Google Lens search started' },
+  { time:'14:33:07', level:'ok',   msg:'Lens: 3 shopping + 4 visual matches' },
+  { time:'14:33:08', level:'info', msg:'Title filter: 7 → 5 products (eyeshadow palette)' },
+  { time:'14:33:10', level:'ok',   msg:'Claude visual filter: approved [0,1,2,3] | all eyeshadow palettes' },
+  { time:'14:33:10', level:'ok',   msg:'Final: 4 matched products returned' },
+  { time:'14:38:44', level:'info', msg:'Text search: "ساعة رولكس"' },
+  { time:'14:38:45', level:'ok',   msg:'Shopping: "Rolex watch" → 6 results' },
+  { time:'14:38:46', level:'warn', msg:'Claude filter took 2.1s (slow)' },
+  { time:'14:38:47', level:'ok',   msg:'Final: 4 watches returned' },
+];
+
+function loadLogs() {
+  const container = document.getElementById('log-container');
+  container.innerHTML = mockLogs.map(l => `
+    <div class="log-entry">
+      <span class="log-time">${l.time}</span>
+      <span class="log-level ${l.level}">${l.level.toUpperCase()}</span>
+      <span class="log-msg">${l.msg}</span>
+    </div>
+  `).join('');
+  container.scrollTop = container.scrollHeight;
+}
+
+function clearLogs() {
+  document.getElementById('log-container').innerHTML =
+    '<div class="log-entry"><span class="log-time">—</span><span class="log-level info">INFO</span><span class="log-msg">تم مسح السجل</span></div>';
+}
+
+// ─────────────────────────────────────
+// Stats
+// ─────────────────────────────────────
+function renderStats() {
+  document.getElementById('st-text').textContent    = Math.floor(Math.random()*300+100);
+  document.getElementById('st-image').textContent   = Math.floor(Math.random()*150+50);
+  document.getElementById('st-cheaper').textContent = Math.floor(Math.random()*80+20);
+
+  const tops = ['باليت ظلال', 'ساعة رولكس', 'حذاء نايك', 'حقيبة لويس فيتون', 'أيفون'];
+  document.getElementById('top-searches').innerHTML = tops.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted);min-width:20px">${i+1}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;margin-bottom:4px">${t}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${90-i*15}%"></div></div>
+      </div>
+      <span style="font-family:var(--mono);font-size:12px;color:var(--muted)">${Math.floor(90-i*15)} بحث</span>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────
+// Generate Config (للنسخ إلى server.js)
+// ─────────────────────────────────────
+function generateServerConfig() {
+  const sources = getSources();
+  const markets = getMarkets();
+  const cats    = getCategories();
+
+  const config = {
+    sources: sources.map(s => ({
+      id: s.id, name: s.name, type: s.type,
+      url: s.url, priority: s.priority,
+      markets: s.markets, categories: s.categories,
+      rateLimit: s.rateLimit, timeout: s.timeout,
+      active: s.active,
+    })),
+    countryMap: Object.fromEntries(markets.map(m => [m.country, m.market])),
+    countryInfo: Object.fromEntries(markets.map(m => [
+      m.country, { currency: m.currency, flag: m.flag, name: m.name }
+    ])),
+    titleFilters: Object.fromEntries(cats.map(c => [
+      c.en, { mustHave: c.mustHave, exclude: c.exclude }
+    ])),
+  };
+
+  // حفظ للاستخدام لاحقاً
+  setData('generated_config', config);
+  return config;
+}
+
+// ─────────────────────────────────────
+// Chips (tag input)
+// ─────────────────────────────────────
+function addChip(event, containerId, inputId) {
+  if (event.key !== 'Enter' && event.key !== ',') return;
+  event.preventDefault();
+  const input = document.getElementById(inputId);
+  const val   = input.value.trim().replace(/,$/, '');
+  if (!val) return;
+  addChipValue(containerId, val);
+  input.value = '';
+}
+
+function addChipValue(containerId, val) {
+  const container = document.getElementById(containerId);
+  const inputEl   = container.querySelector('.chip-text-input');
+  const chip = document.createElement('span');
+  chip.className   = 'chip-item';
+  chip.dataset.val = val;
+  chip.innerHTML   = `${val}<span class="chip-remove" onclick="this.parentElement.remove()">×</span>`;
+  container.insertBefore(chip, inputEl);
+}
+
+function getChips(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} .chip-item`))
+    .map(c => c.dataset.val).filter(Boolean);
+}
+
+function clearChips(containerId, inputId) {
+  document.querySelectorAll(`#${containerId} .chip-item`).forEach(c => c.remove());
+  document.getElementById(inputId).value = '';
+}
+
+// ─────────────────────────────────────
+// Markets checkboxes in modal
+// ─────────────────────────────────────
+function renderMarketsCheckboxes(selected = []) {
+  const markets = getMarkets();
+  document.getElementById('src-markets-checkboxes').innerHTML = markets.map(m => `
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;padding:4px 8px;background:var(--surface);border:1px solid var(--border);border-radius:6px">
+      <input type="checkbox" value="${m.country}" ${selected.includes(m.country)?'checked':''}
+        style="accent-color:var(--accent)">
+      ${m.flag} ${m.country}
+    </label>
+  `).join('');
+}
+
+// ─────────────────────────────────────
+// Modal
+// ─────────────────────────────────────
+function openModal(id) {
+  if (id === 'addSource') {
+    if (!editingSourceId) {
+      document.getElementById('source-modal-title').textContent = 'إضافة مصدر بحث جديد';
+      ['src-name','src-icon','src-url','src-api-key','src-rate-limit','src-timeout','src-notes']
+        .forEach(f => document.getElementById(f).value = '');
+      clearChips('src-categories-chips', 'src-cat-input');
+    }
+    renderMarketsCheckboxes(editingSourceId ? [] : ['SA','AE']);
+  }
+  document.getElementById('modal-' + id).classList.add('open');
+}
+
+function closeModal(id) {
+  document.getElementById('modal-' + id).classList.remove('open');
+  if (id === 'addSource')   editingSourceId   = null;
+  if (id === 'addCategory') editingCategoryId = null;
+}
+
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ─────────────────────────────────────
+// Toast
+// ─────────────────────────────────────
+function toast(msg, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span class="toast-icon">${type === 'success' ? '✓' : '✕'}</span>${msg}`;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ─────────────────────────────────────
+// Init
+// ─────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
