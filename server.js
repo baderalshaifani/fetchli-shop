@@ -512,12 +512,14 @@ Brand: ${analysis.brand || 'unknown'}
 
 Evaluate each search result. APPROVE only if it is the EXACT SAME product category.
 
-REJECTION RULES (non-negotiable):
-- Image = eyeshadow palette → REJECT: lipstick, foundation, mascara, skincare, makeup kits, eyeliner, bronzer, any bundle/set
-- Image = lipstick → REJECT: eyeshadow, foundation, mascara, skincare
-- Image = watch → REJECT: bags, shoes, jewelry, sunglasses
-- Image = handbag → REJECT: watches, shoes, clothing
-- Image = sneakers → REJECT: bags, watches, clothing
+APPROVAL RULES — approve if product is the same category OR closely related:
+- Image = watch → APPROVE: watches, smartwatches. REJECT: bags, shoes, clothing, perfume
+- Image = eyeshadow palette → APPROVE: eyeshadow palettes, eye makeup. REJECT: lipstick, foundation, skincare, full makeup sets
+- Image = lipstick → APPROVE: lipstick, lip gloss, lip products. REJECT: eyeshadow, foundation, skincare
+- Image = handbag → APPROVE: bags, handbags, purses. REJECT: watches, shoes, clothing
+- Image = sneakers → APPROVE: shoes, sneakers, footwear. REJECT: bags, watches, clothing
+
+IMPORTANT: When in doubt, APPROVE rather than reject. Empty results are worse than slightly imperfect ones.
 
 Products:
 ${productList}
@@ -552,9 +554,14 @@ JSON only:
 
     console.log(`Claude visual filter: approved [${parsed.approved}] | ${parsed.reason}`);
 
-    if (!parsed.approved?.length) return products;
+    // لو Claude حذف الكل — ارجع المنتجات كما هي (أفضل من لا شيء)
+    if (!parsed.approved?.length) {
+      console.log('Claude filter rejected all — returning original products');
+      return products;
+    }
     const filtered = parsed.approved.map(i => products[i]).filter(Boolean);
-    return filtered.length >= 2 ? filtered : products;
+    // لو ما تبقى شيء — ارجع الكل
+    return filtered.length >= 1 ? filtered : products;
   } catch (err) {
     console.error('Claude visual filter error:', err.message);
     return products;
@@ -798,7 +805,7 @@ async function universalSearch(source, query, market, wantCheaper) {
     console.log(`${source.icon} ${source.name}: searching "${query}"`);
     const response = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...headers },
-      signal: AbortSignal.timeout((source.timeout || 12) * 1000),
+      signal: AbortSignal.timeout((source.timeout || 20) * 1000),
     });
 
     const data = await response.json();
@@ -1124,7 +1131,7 @@ const DEFAULT_CONFIG = {
     { id:'serp-lens',     name:'Google Lens',       icon:'🔍', type:'serpapi_lens',    url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:false,  notes:'البحث البصري المباشر — الأدق' },
     { id:'serp-shopping', name:'Google Shopping',    icon:'🛍️', type:'serpapi_shopping', url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:false,  notes:'بحث بكلمات في Google Shopping' },
     { id:'rainforest', name:'Amazon (Rainforest)', icon:'📦', type:'rainforest', searchUrl:'https://api.rainforestapi.com/request', url:'', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:true, authType:'api_key_query', appKeyEnv:'RAINFOREST_API_KEY', queryParam:'search_term', responseMapping:'search_results', fieldMapping:{name:'title',price:'price.raw',image:'image',url:'link',rating:'rating'}, notes:'بيانات Amazon المباشرة' },
-    { id:'aliexpress', name:'AliExpress', icon:'🛒', type:'aliexpress', searchUrl:'https://api-sg.aliexpress.com/sync', url:'', priority:4, markets:['SA','AE','EG','US','KW','QA'], categories:[], rateLimit:1000, timeout:12, active:true, authType:'aliexpress_md5', appKeyEnv:'ALIEXPRESS_APP_KEY', appSecretEnv:'ALIEXPRESS_APP_SECRET', queryParam:'keywords', apiMethod:'aliexpress.affiliate.product.query', responseMapping:'aliexpress_affiliate_product_query_response.resp_result.result.products.product', fieldMapping:{name:'product_title',price:'sale_price',image:'product_main_image_url',url:'product_detail_url',rating:'evaluate_rate'}, queryParams:{page_no:'1',page_size:'6',tracking_id:'fetchli',target_language:'AR',fields:'product_id,product_title,sale_price,sale_price_currency,product_main_image_url,product_detail_url,evaluate_rate,lastest_volume'}, notes:'AliExpress Affiliate API — يدعم جميع الدول' },
+    { id:'aliexpress', name:'AliExpress', icon:'🛒', type:'aliexpress', searchUrl:'https://api-sg.aliexpress.com/sync', url:'', priority:4, markets:['SA','AE','EG','US','KW','QA'], categories:[], rateLimit:1000, timeout:12, active:true, authType:'aliexpress_md5', appKeyEnv:'ALIEXPRESS_APP_KEY', appSecretEnv:'ALIEXPRESS_APP_SECRET', queryParam:'keywords', apiMethod:'aliexpress.affiliate.product.query', responseMapping:'aliexpress_affiliate_product_query_response.resp_result.result.products.product', fieldMapping:{name:'product_title',price:'sale_price',image:'product_main_image_url',url:'product_detail_url',rating:'evaluate_rate'}, queryParams:{page_no:'1',page_size:'20',tracking_id:'fetchli',target_currency:'USD',target_language:'EN',fields:'product_id,product_title,sale_price,sale_price_currency,product_main_image_url,product_detail_url,evaluate_rate,lastest_volume'}, notes:'AliExpress Affiliate API — يدعم جميع الدول' },
   ],
   markets: [
     { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
