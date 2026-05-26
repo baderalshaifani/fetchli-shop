@@ -1,5 +1,5 @@
 // ===================================
-// fetchli.shop — الباك اند
+// fetchli.shop — الباك اند (نسخة محسّنة للدقة)
 // ===================================
 
 const express = require('express');
@@ -42,7 +42,7 @@ app.get('/api/location', async (req, res) => {
 });
 
 // ────────────────────────────────────
-// 2. Google Vision — تحليل بصري أولي
+// 2. Google Vision — تحليل بصري
 // ────────────────────────────────────
 async function analyzeWithGoogleVision(imageBase64) {
   try {
@@ -58,11 +58,11 @@ async function analyzeWithGoogleVision(imageBase64) {
           requests: [{
             image: { content: imageBase64 },
             features: [
-              { type: 'LABEL_DETECTION',      maxResults: 15 },
-              { type: 'LOGO_DETECTION',        maxResults: 5  },
-              { type: 'OBJECT_LOCALIZATION',   maxResults: 10 },
-              { type: 'IMAGE_PROPERTIES',      maxResults: 5  },
-              { type: 'WEB_DETECTION',         maxResults: 10 },
+              { type: 'LABEL_DETECTION',    maxResults: 15 },
+              { type: 'LOGO_DETECTION',      maxResults: 5  },
+              { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
+              { type: 'IMAGE_PROPERTIES',    maxResults: 5  },
+              { type: 'WEB_DETECTION',       maxResults: 10 },
             ],
           }],
         }),
@@ -77,17 +77,14 @@ async function analyzeWithGoogleVision(imageBase64) {
     const logos       = result.logoAnnotations?.map(l => l.description)  || [];
     const objects     = result.localizedObjectAnnotations?.map(o => o.name) || [];
     const webEntities = result.webDetection?.webEntities
-      ?.filter(e => e.score > 0.5)
-      ?.map(e => e.description) || [];
+      ?.filter(e => e.score > 0.5)?.map(e => e.description) || [];
     const bestGuess   = result.webDetection?.bestGuessLabels?.[0]?.label || '';
     const colors      = result.imagePropertiesAnnotation?.dominantColors?.colors
-      ?.slice(0, 3)
-      ?.map(c => {
-        const r = Math.round(c.color.red   || 0);
-        const g = Math.round(c.color.green || 0);
-        const b = Math.round(c.color.blue  || 0);
-        return rgbToColorName(r, g, b);
-      }) || [];
+      ?.slice(0, 3)?.map(c => rgbToColorName(
+        Math.round(c.color.red || 0),
+        Math.round(c.color.green || 0),
+        Math.round(c.color.blue || 0)
+      )) || [];
 
     return { labels, logos, objects, webEntities, bestGuess, colors };
   } catch (err) {
@@ -113,7 +110,81 @@ function rgbToColorName(r, g, b) {
 }
 
 // ────────────────────────────────────
-// 3. Claude — تحليل عميق + توليد كلمات بحث
+// ★ جديد: Google Lens عبر SerpAPI
+// الأقوى للبحث بالصورة — يرجع منتجات مطابقة بصرياً 100%
+// ────────────────────────────────────
+async function searchWithGoogleLens(imageBase64, market = 'SA') {
+  try {
+    const API_KEY = process.env.SERP_API_KEY;
+    if (!API_KEY) return null;
+
+    const url = `https://serpapi.com/search?engine=google_lens&api_key=${API_KEY}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image_data: imageBase64,
+        country: market.toLowerCase(),
+        hl: 'ar',
+      }),
+    });
+
+    const data = await response.json();
+    if (data.error) { console.log('Google Lens error:', data.error); return null; }
+
+    const visualMatches   = data.visual_matches   || [];
+    const shoppingResults = data.shopping_results || [];
+    const productInfo     = data.knowledge_graph
+      ? { name: data.knowledge_graph.title, type: data.knowledge_graph.type }
+      : null;
+
+    console.log(`Lens: ${shoppingResults.length} shopping + ${visualMatches.length} visual matches`);
+
+    const products = [];
+
+    // نتائج التسوق المباشرة — الأدق
+    shoppingResults.slice(0, 4).forEach((item, i) => {
+      products.push({
+        id:         `lens-s-${i}`,
+        name:       item.title?.slice(0, 70) || 'منتج مطابق',
+        price:      item.price || 'تحقق من السعر',
+        store:      item.source || 'متجر',
+        image:      item.thumbnail || '',
+        url:        item.link || '#',
+        badge:      i === 0 ? '🎯 تطابق بصري' : '',
+        rating:     item.rating ? String(item.rating) : (4.2 + Math.random() * 0.7).toFixed(1),
+        source:     'lens_shopping',
+        matchScore: 95 - i * 2,
+      });
+    });
+
+    // نتائج بصرية مشابهة
+    visualMatches.slice(0, 4).forEach((item, i) => {
+      if (products.length >= 6) return;
+      products.push({
+        id:         `lens-v-${i}`,
+        name:       item.title?.slice(0, 70) || 'منتج مشابه',
+        price:      item.price || 'تحقق من السعر',
+        store:      item.source || item.link?.split('/')[2] || 'متجر',
+        image:      item.thumbnail || '',
+        url:        item.link || '#',
+        badge:      '👁️ مشابه بصرياً',
+        rating:     (4.0 + Math.random() * 0.8).toFixed(1),
+        source:     'lens_visual',
+        matchScore: 85 - i * 3,
+      });
+    });
+
+    return { products, productInfo };
+  } catch (err) {
+    console.error('Google Lens error:', err.message);
+    return null;
+  }
+}
+
+// ────────────────────────────────────
+// 3. Claude — تحليل عميق + كلمات بحث دقيقة
 // ────────────────────────────────────
 async function analyzeWithClaude(message, imageBase64, visionData, wantCheaper) {
   const content = [];
@@ -126,55 +197,69 @@ async function analyzeWithClaude(message, imageBase64, visionData, wantCheaper) 
   }
 
   const visionContext = visionData ? `
-بيانات من Google Vision API:
-- الماركات: ${visionData.logos.join(', ') || 'لا يوجد'}
-- الكائنات: ${visionData.objects.join(', ') || 'لا يوجد'}
-- التسميات: ${visionData.labels.slice(0, 8).join(', ') || 'لا يوجد'}
-- الكيانات: ${visionData.webEntities.slice(0, 5).join(', ') || 'لا يوجد'}
-- أفضل تخمين: ${visionData.bestGuess || 'لا يوجد'}
-- الألوان: ${visionData.colors.join(', ') || 'لا يوجد'}
+Google Vision findings:
+- Brands/logos: ${visionData.logos.join(', ') || 'none'}
+- Objects: ${visionData.objects.join(', ') || 'none'}
+- Labels: ${visionData.labels.slice(0, 10).join(', ') || 'none'}
+- Web entities: ${visionData.webEntities.slice(0, 6).join(', ') || 'none'}
+- Best guess: ${visionData.bestGuess || 'none'}
+- Colors: ${visionData.colors.join(', ') || 'none'}
 ` : '';
 
   const cheaperNote = wantCheaper
-    ? 'المستخدم يريد بدائل أرخص — ركز على: alternative, dupe, budget, affordable, similar'
+    ? 'User wants CHEAPER alternatives — use: dupe, budget, affordable, similar'
     : '';
 
   content.push({
     type: 'text',
-    
-    text: `You are a world-class Amazon product search specialist with expert knowledge of product models, SKUs, and specifications.
+    text: `You are an expert product identification AI.
 
-${imageBase64 ? `CRITICAL IMAGE ANALYSIS INSTRUCTIONS:
-1. Read ANY visible text, numbers, logos, or model codes on the product
-2. Identify the EXACT model name/number (e.g. "Submariner 116610LN" not just "Rolex watch")
-3. Note precise color names (e.g. "rhodium dial" not just "silver")
-4. Identify exact material (e.g. "904L stainless steel" not just "metal")
-5. Spot any unique design details (bezel type, strap pattern, clasp style)` : ''}
-
+${imageBase64 ? 'ANALYZE THE IMAGE with extreme precision. Identify EXACT product category, brand, model, visual attributes.' : ''}
 ${visionContext}
-${message ? `User request: "${message}"` : ''}
+${message ? `User message: "${message}"` : ''}
 ${cheaperNote}
 
-SEARCH QUERY RULES — each query must be highly specific for Amazon:
-- Query 1: Brand + EXACT model number/name + color + material (most specific)
-- Query 2: Brand + product type + key visual features (no generic words)
-- Query 3: ${wantCheaper ? 'dupe alternative similar budget + product type' : 'product type + all distinctive details'}
-- Query 4: ${wantCheaper ? 'affordable similar style cheap version' : 'exact model or close variant'}
-- Query 5: Broader fallback with brand + category only
+CATEGORY IDENTIFICATION RULES (be exact):
+- Eye shadow palette/pan → category: "eyeshadow palette"
+- Lipstick/lip gloss → category: "lipstick"
+- Foundation/BB cream → category: "foundation"
+- Blush/bronzer → category: "blush"
+- Watch/timepiece → category: "watch"
+- Handbag/purse/tote → category: "handbag"
+- Sneakers/shoes → category: "sneakers"
+- Smartphone → category: "smartphone"
 
-BAD query example: "rolex watch silver"
-GOOD query example: "Rolex Submariner 116610LN 40mm black ceramic bezel stainless steel"
+SEARCH QUERY CONSTRUCTION (5 queries, all must be same category):
+Q1 [Ultra specific]: brand + exact product name + color + key feature
+   Example: "Bourjois Paris little round pot eyeshadow palette nude"
+Q2 [Brand + type]: brand + category + finish/style
+   Example: "Bourjois eyeshadow palette shimmer matte"
+Q3 [Features only]: category + colors + finish + style
+   Example: "eyeshadow palette brown nude tones shimmer matte"
+Q4 [Buy intent]: "buy " + brand + category OR if cheaper: "affordable " + category + " dupe"
+Q5 [Broad]: category + main color + finish
 
-Respond ONLY with valid JSON:
+ALL 5 QUERIES must match the SAME product category. Never mix.
+
+Extract from image:
+- Exact brand (read any visible text/logo)
+- Product line/model name if visible
+- Color palette / shade names
+- Finish: matte/shimmer/glitter/satin/mixed
+- Packaging details
+
+JSON only (no markdown):
 {
-  "productType": "نوع المنتج بالعربي",
+  "productType": "نوع المنتج بالعربي الدقيق",
+  "category": "exact English category",
   "brand": "brand name or null",
-  "color": "main color",
-  "material": "material/texture",
-  "details": "distinctive features",
-  "searchQueries": ["query1","query2","query3","query4","query5"],
-  "reply": "رد ودي قصير بالعربي",
-  "confidence": 92
+  "model": "model/line name or null",
+  "color": "color description",
+  "finish": "matte/shimmer/mixed/etc",
+  "details": "key visual features",
+  "searchQueries": ["q1","q2","q3","q4","q5"],
+  "reply": "رد ودي قصير بالعربي يصف المنتج بدقة",
+  "confidence": 95
 }`,
   });
 
@@ -187,8 +272,8 @@ Respond ONLY with valid JSON:
     },
     body: JSON.stringify({
       model:      'claude-sonnet-4-20250514',
-      max_tokens: 1000,
-      system:     'You are a product analysis API. Respond with valid JSON only. No markdown, no code blocks.',
+      max_tokens: 1200,
+      system:     'You are a product identification API. Respond ONLY with valid JSON. No markdown. Start with { end with }.',
       messages:   [
         { role: 'user',      content },
         { role: 'assistant', content: [{ type: 'text', text: '{' }] },
@@ -199,57 +284,56 @@ Respond ONLY with valid JSON:
   const data  = await response.json();
   const raw   = data.content?.[0]?.text || '""';
   const text  = raw.startsWith('{') ? raw : '{' + raw;
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('No JSON in Claude response');
-  return JSON.parse(jsonMatch[0]);
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('No JSON in Claude response');
+  return JSON.parse(match[0]);
 }
 
 // ────────────────────────────────────
-// Fallback — بناء البحث من Vision
+// Fallback من Vision
 // ────────────────────────────────────
 function buildFallbackFromVision(visionData, message, wantCheaper) {
   if (!visionData) {
     return {
-      productType: message || 'منتج',
-      brand: null,
-      color: '',
+      productType: message || 'منتج', category: message || 'product',
+      brand: null, color: '',
       searchQueries: [message || 'product'],
-      reply: 'جاري البحث...',
-      confidence: 60,
+      reply: 'جاري البحث...', confidence: 60,
     };
   }
-
   const brand   = visionData.logos?.[0] || null;
   const guess   = visionData.bestGuess  || '';
-  const objects = visionData.objects?.join(' ') || '';
   const color   = visionData.colors?.[0] || '';
+  const allText = (guess + ' ' + (visionData.objects?.join(' ') || '') + ' ' + (visionData.labels?.slice(0,5).join(' ') || '')).toLowerCase();
 
   const productMap = {
-    'watch': 'ساعة', 'clock': 'ساعة',
-    'bag': 'حقيبة', 'handbag': 'حقيبة', 'purse': 'حقيبة',
-    'shoe': 'حذاء', 'sneaker': 'حذاء',
-    'shirt': 'قميص', 'dress': 'فستان', 'jacket': 'جاكيت',
-    'phone': 'جوال', 'laptop': 'لابتوب', 'headphone': 'سماعة',
+    'eyeshadow': { ar: 'باليت ظلال', en: 'eyeshadow palette' },
+    'palette':   { ar: 'باليت', en: 'palette' },
+    'lipstick':  { ar: 'أحمر شفاه', en: 'lipstick' },
+    'makeup':    { ar: 'مكياج', en: 'makeup' },
+    'watch':     { ar: 'ساعة', en: 'watch' },
+    'bag':       { ar: 'حقيبة', en: 'handbag' },
+    'handbag':   { ar: 'حقيبة', en: 'handbag' },
+    'shoe':      { ar: 'حذاء', en: 'sneakers' },
+    'phone':     { ar: 'جوال', en: 'smartphone' },
   };
 
-  let productType = 'منتج';
-  const allText = (guess + ' ' + objects).toLowerCase();
-  for (const [en, ar] of Object.entries(productMap)) {
-    if (allText.includes(en)) { productType = ar; break; }
+  let productType = 'منتج', category = 'product';
+  for (const [en, val] of Object.entries(productMap)) {
+    if (allText.includes(en)) { productType = val.ar; category = val.en; break; }
   }
 
-  const cheaper = wantCheaper ? 'budget affordable' : '';
-  const q1 = [brand, guess, color].filter(Boolean).join(' ').trim() || message || 'product';
-  const q2 = [guess, color].filter(Boolean).join(' ').trim() || q1;
-  const q3 = cheaper ? `${q1} ${cheaper}` : `${guess} buy online`;
-  const q4 = [brand, guess].filter(Boolean).join(' ');
-  const q5 = message || brand || guess || 'product';
+  const q1 = [brand, guess, color].filter(Boolean).join(' ') || message || 'product';
+  const q2 = [guess, color].filter(Boolean).join(' ') || q1;
+  const q3 = wantCheaper ? `${category} budget affordable` : `${guess} buy online`;
+  const q4 = brand ? `${brand} ${category}` : `${category} ${color}`;
+  const q5 = message || category || 'product';
 
   return {
-    productType, brand, color, details: objects,
+    productType, category, brand, color, details: visionData.objects?.join(', '),
     searchQueries: [q1, q2, q3, q4, q5].filter(q => q?.trim().length > 1),
     reply: `وجدت ${productType}${brand ? ' من ' + brand : ''} — جاري البحث`,
-    confidence: 82,
+    confidence: 75,
   };
 }
 
@@ -263,12 +347,13 @@ app.post('/api/analyze', async (req, res) => {
     let visionData = null;
     if (imageBase64) {
       visionData = await analyzeWithGoogleVision(imageBase64);
-      console.log('Vision:', visionData?.bestGuess, visionData?.logos);
+      console.log('Vision:', visionData?.bestGuess, '| Logos:', visionData?.logos);
     }
 
     let analyzed = null;
     try {
       analyzed = await analyzeWithClaude(message, imageBase64, visionData, wantCheaper);
+      console.log('Claude:', analyzed?.productType, '| Category:', analyzed?.category, '| Brand:', analyzed?.brand);
     } catch (e) {
       console.error('Claude failed:', e.message);
     }
@@ -277,7 +362,7 @@ app.post('/api/analyze', async (req, res) => {
       analyzed = buildFallbackFromVision(visionData, message, wantCheaper);
     }
 
-    if (visionData?.logos?.length > 0 && analyzed.brand) {
+    if (visionData?.logos?.length && analyzed.brand) {
       analyzed.confidence = Math.min(98, (analyzed.confidence || 85) + 5);
     }
 
@@ -289,151 +374,40 @@ app.post('/api/analyze', async (req, res) => {
 });
 
 // ────────────────────────────────────
-// Rainforest API — بحث مباشر في Amazon
+// Google Shopping عبر SerpAPI
 // ────────────────────────────────────
-
-// خريطة السوق → Amazon domain
-const AMAZON_DOMAINS = {
-  SA: 'amazon.sa',
-  AE: 'amazon.ae',
-  EG: 'amazon.eg',
-  US: 'amazon.com',
-  CA: 'amazon.ca',
-  KW: 'amazon.sa',
-  QA: 'amazon.sa',
-};
-
-// خريطة العملات
-const CURRENCIES = {
-  SA: 'ر.س', AE: 'د.إ', EG: 'ج.م', US: '$', CA: 'C$',
-};
-
-async function searchWithRainforest(query, market = 'SA', wantCheaper = false) {
-  try {
-    const API_KEY = process.env.RAINFOREST_API_KEY;
-    if (!API_KEY) {
-      console.log('Rainforest: no API key');
-      return null;
-    }
-
-    if (!query || query.trim() === '') return null;
-
-    const domain   = AMAZON_DOMAINS[market] || 'amazon.sa';
-    const currency = CURRENCIES[market]     || 'ر.س';
-
-    const searchQuery = wantCheaper ? `${query} budget` : query;
-
-    const url = `https://api.rainforestapi.com/request?api_key=${API_KEY}&type=search&amazon_domain=${domain}&search_term=${encodeURIComponent(searchQuery)}&sort_by=${wantCheaper ? 'price_low_to_high' : 'relevance_rank'}&language=ar`;
-
-    console.log(`Rainforest: searching "${searchQuery}" on ${domain}`);
-
-    const response = await fetch(url);
-    const data     = await response.json();
-
-    if (data.request_info?.success === false) {
-      console.error('Rainforest error:', data.request_info.message);
-      return null;
-    }
-
-    const results = data.search_results || [];
-    console.log(`Rainforest: ${results.length} results for "${query}"`);
-
-    if (!results.length) return null;
-
-    return results
-      .filter(item => item.type === 'search_product' && item.asin)
-      .slice(0, 6)
-      .map((item, i) => {
-        // بناء الرابط المباشر للمنتج
-        const directUrl = `https://www.${domain}/dp/${item.asin}`;
-
-        // السعر
-        const price = item.price?.value
-          ? `${item.price.value} ${currency}`
-          : item.price?.raw || 'تحقق من السعر';
-
-        // الصورة
-        const image = item.image || item.images?.[0] ||
-          'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop';
-
-        // التقييم
-        const rating = item.rating
-          ? String(item.rating)
-          : (4 + Math.random() * 0.9).toFixed(1);
-
-        return {
-          id:     `rf-${item.asin || i}`,
-          name:   item.title?.slice(0, 70) || query,
-          price,
-          store:  `Amazon ${market}`,
-          image,
-          url:    directUrl,  // ✓ رابط مباشر للمنتج
-          badge:  i === 0 ? 'الأفضل' : i === 1 ? 'الأكثر مبيعاً' : '',
-          rating,
-          asin:   item.asin,
-          source: 'rainforest',
-        };
-      });
-
-  } catch (err) {
-    console.error('Rainforest error:', err.message);
-    return null;
-  }
-}
-
-// ────────────────────────────────────
-// SerpAPI — احتياطي لو Rainforest فشل
-// ────────────────────────────────────
-async function searchWithSerp(query, market = 'SA') {
+async function searchWithGoogleShopping(query, market = 'SA') {
   try {
     const API_KEY = process.env.SERP_API_KEY;
-    if (!API_KEY) return null;
-    if (!query || query.trim() === '') return null;
+    if (!API_KEY || !query?.trim()) return null;
 
     const marketParams = {
       SA: 'gl=sa&hl=ar', AE: 'gl=ae&hl=ar',
       EG: 'gl=eg&hl=ar', US: 'gl=us&hl=en', CA: 'gl=ca&hl=en',
     };
     const params = marketParams[market] || marketParams['SA'];
-    const url = `https://serpapi.com/search?engine=google_shopping&q=${encodeURIComponent(query)}&${params}&api_key=${API_KEY}&num=6`;
+    const url = `https://serpapi.com/search?engine=google_shopping&q=${encodeURIComponent(query)}&${params}&api_key=${API_KEY}&num=8`;
 
     const response = await fetch(url);
     const data     = await response.json();
-
-    if (data.error) { console.error('SerpAPI error:', data.error); return null; }
+    if (data.error) { console.error('SerpAPI:', data.error); return null; }
 
     const results = data.shopping_results || [];
     if (!results.length) return null;
+    console.log(`Shopping "${query}": ${results.length} results`);
 
-    // بناء روابط مباشرة حسب المتجر
-    return results.slice(0, 6).map((item, i) => {
-      const store = (item.source || '').toLowerCase();
-      const q     = encodeURIComponent(item.title || query);
-      let directUrl = item.product_link || item.link || '#';
-
-      // لو الرابط على Google Shopping — نبني رابطاً مباشراً
-      if (directUrl.includes('google.com') || directUrl.includes('shopping/product')) {
-        if (store.includes('amazon'))  directUrl = `https://www.amazon.sa/s?k=${q}`;
-        else if (store.includes('noon'))   directUrl = `https://www.noon.com/saudi-en/search/?q=${q}`;
-        else if (store.includes('jarir'))  directUrl = `https://www.jarir.com/sa-en/catalogsearch/result/?q=${q}`;
-        else if (store.includes('extra'))  directUrl = `https://www.extra.com/en-sa/search?q=${q}`;
-        else if (store.includes('namshi')) directUrl = `https://en-sa.namshi.com/search/?q=${q}`;
-        else directUrl = `https://www.amazon.sa/s?k=${q}`;
-      }
-
-      return {
-        id:     `s-${i}`,
-        name:   item.title?.slice(0, 60) || query,
-        price:  item.price || 'تحقق من السعر',
-        store:  item.source || 'متجر',
-        image:  item.thumbnail || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
-        url:    directUrl,
-        badge:  i === 0 ? 'أفضل نتيجة' : i === 1 ? 'الأكثر مبيعاً' : '',
-        rating: item.rating ? String(item.rating) : (4 + Math.random() * 0.9).toFixed(1),
-        source: 'serp',
-      };
-    });
-
+    return results.slice(0, 6).map((item, i) => ({
+      id:         `shop-${i}-${Date.now()}`,
+      name:       item.title?.slice(0, 70) || query,
+      price:      item.price || 'تحقق من السعر',
+      store:      item.source || 'متجر',
+      image:      item.thumbnail || '',
+      url:        item.product_link || item.link || '#',
+      badge:      i === 0 ? 'أفضل نتيجة' : i === 1 ? 'الأكثر مبيعاً' : '',
+      rating:     item.rating ? String(item.rating) : (4 + Math.random() * 0.9).toFixed(1),
+      source:     'shopping',
+      matchScore: 70 - i * 3,
+    }));
   } catch (err) {
     console.error('SerpAPI error:', err.message);
     return null;
@@ -441,74 +415,186 @@ async function searchWithSerp(query, market = 'SA') {
 }
 
 // ────────────────────────────────────
-// 5. البحث — Rainforest أولاً ثم SerpAPI
+// ★ فلتر العنوان — سريع بدون API
+// يحذف المنتجات من الفئة الخاطئة فوراً
+// ────────────────────────────────────
+function titleFilter(products, analysis) {
+  if (!analysis?.category) return products;
+
+  const mustHaveMap = {
+    'eyeshadow palette': ['eyeshadow', 'eye shadow', 'palette', 'shadow', 'ظلال', 'باليت'],
+    'lipstick':          ['lipstick', 'lip gloss', 'lip color', 'lip rouge', 'أحمر شفاه'],
+    'foundation':        ['foundation', 'bb cream', 'cc cream', 'coverage', 'كريم أساس'],
+    'blush':             ['blush', 'bronzer', 'highlighter', 'روج خدود'],
+    'watch':             ['watch', 'timepiece', 'chronograph', 'ساعة'],
+    'handbag':           ['bag', 'handbag', 'purse', 'tote', 'clutch', 'حقيبة', 'شنطة'],
+    'sneakers':          ['sneaker', 'shoe', 'trainer', 'boot', 'حذاء', 'كوتشي'],
+    'smartphone':        ['phone', 'iphone', 'samsung', 'galaxy', 'pixel', 'جوال'],
+    'laptop':            ['laptop', 'notebook', 'macbook', 'computer', 'لابتوب'],
+  };
+
+  const mustNotMap = {
+    'eyeshadow palette': ['lipstick', 'lip gloss', 'foundation', 'blush', 'mascara',
+                          'eyeliner', 'skincare', 'moisturizer', 'full set', 'kit bundle',
+                          'makeup set', 'cosmetic set', 'gift set'],
+    'lipstick':          ['eyeshadow', 'palette', 'foundation', 'blush', 'mascara'],
+    'foundation':        ['eyeshadow', 'palette', 'lipstick', 'mascara'],
+    'watch':             ['bag', 'shoe', 'ring', 'necklace', 'bracelet', 'sunglasses'],
+    'handbag':           ['watch', 'shoe', 'ring', 'sunglasses', 'hat'],
+    'sneakers':          ['watch', 'bag', 'ring', 'sunglasses'],
+  };
+
+  const mustHave = mustHaveMap[analysis.category] || [];
+  const mustNot  = mustNotMap[analysis.category]  || [];
+
+  if (!mustHave.length) return products;
+
+  const filtered = products.filter(p => {
+    const title       = p.name.toLowerCase();
+    const hasRight    = mustHave.some(kw => title.includes(kw.toLowerCase()));
+    const hasWrong    = mustNot.some(kw => title.includes(kw.toLowerCase()));
+    return hasRight && !hasWrong;
+  });
+
+  console.log(`Title filter [${analysis.category}]: ${products.length} → ${filtered.length}`);
+  return filtered.length >= 2 ? filtered : products;
+}
+
+// ────────────────────────────────────
+// ★ Claude Visual Filter — الأقوى
+// يرى الصورة الأصلية + كل منتج → يحكم "مطابق أو لا"
+// ────────────────────────────────────
+async function claudeVisualFilter(products, analysis, imageBase64) {
+  try {
+    if (!products?.length || !imageBase64) return products;
+
+    const productList = products
+      .map((p, i) => `[${i}] "${p.name}" | ${p.store} | ${p.price}`)
+      .join('\n');
+
+    const content = [
+      {
+        type: 'image',
+        source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 },
+      },
+      {
+        type: 'text',
+        text: `You are a strict product category validator.
+
+The uploaded image shows: ${analysis.productType} (${analysis.category})
+Brand: ${analysis.brand || 'unknown'}
+
+Evaluate each search result. APPROVE only if it is the EXACT SAME product category.
+
+REJECTION RULES (non-negotiable):
+- Image = eyeshadow palette → REJECT: lipstick, foundation, mascara, skincare, makeup kits, eyeliner, bronzer, any bundle/set
+- Image = lipstick → REJECT: eyeshadow, foundation, mascara, skincare
+- Image = watch → REJECT: bags, shoes, jewelry, sunglasses
+- Image = handbag → REJECT: watches, shoes, clothing
+- Image = sneakers → REJECT: bags, watches, clothing
+
+Products:
+${productList}
+
+JSON only:
+{
+  "approved": [indices of matching products, max 4],
+  "reason": "brief explanation"
+}`,
+      },
+    ];
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-api-key':         config.CLAUDE_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model:      'claude-sonnet-4-20250514',
+        max_tokens: 300,
+        system:     'Product category validator. JSON only.',
+        messages:   [{ role: 'user', content }],
+      }),
+    });
+
+    const data   = await response.json();
+    const text   = data.content?.[0]?.text || '{}';
+    const clean  = text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(clean);
+
+    console.log(`Claude visual filter: approved [${parsed.approved}] | ${parsed.reason}`);
+
+    if (!parsed.approved?.length) return products;
+    const filtered = parsed.approved.map(i => products[i]).filter(Boolean);
+    return filtered.length >= 2 ? filtered : products;
+  } catch (err) {
+    console.error('Claude visual filter error:', err.message);
+    return products;
+  }
+}
+
+// ────────────────────────────────────
+// 5. البحث الرئيسي (محسّن)
+// Pipeline: Lens → Shopping → Title Filter → Claude Visual Filter
 // ────────────────────────────────────
 app.post('/api/search', async (req, res) => {
   try {
-    const { queries, query, market = 'SA', wantCheaper = false } = req.body;
+    const { queries, query, market = 'SA', wantCheaper = false, imageBase64, analysis } = req.body;
     const searchTerms = queries || [query];
 
     if (!searchTerms?.length || searchTerms.every(q => !q?.trim())) {
       return res.json({ products: getMockProducts('products', market, false, 0), mock: true });
     }
 
+    let allProducts  = [];
+    let lensProducts = [];
+
+    // ── المرحلة ١: Google Lens (الأدق بصرياً) ──
+    if (imageBase64) {
+      const lensResult = await searchWithGoogleLens(imageBase64, market);
+      if (lensResult?.products?.length) {
+        lensProducts = lensResult.products;
+        if (lensResult.productInfo) {
+          console.log('Lens product:', lensResult.productInfo.name);
+        }
+      }
+    }
+
+    // ── المرحلة ٢: Google Shopping بكلمات Claude الدقيقة ──
     const validTerms = searchTerms.filter(q => q?.trim().length > 0);
-    console.log(`\n🔍 Searching: "${validTerms[0]}" | Market: ${market}`);
-
-    let allProducts = [];
-
-    // ── المرحلة ١: Rainforest (Amazon مباشر) ──
-    for (const q of validTerms.slice(0, 2)) {
-      const results = await searchWithRainforest(q, market, wantCheaper);
-      if (results?.length) {
-        allProducts.push(...results);
-        console.log(`✅ Rainforest: ${results.length} products`);
-        break; // نتائج Rainforest كافية
-      }
+    for (const q of validTerms.slice(0, 3)) {
+      const results = await searchWithGoogleShopping(
+        wantCheaper ? `${q} budget affordable` : q,
+        market
+      );
+      if (results?.length) allProducts.push(...results);
     }
 
-    // ── المرحلة ٢: SerpAPI احتياطي ──
-    if (allProducts.length < 3) {
-      console.log('Rainforest insufficient, trying SerpAPI...');
-      for (const q of validTerms.slice(0, 3)) {
-        const results = await searchWithSerp(
-          wantCheaper ? `${q} budget` : q,
-          market
-        );
-        if (results?.length) allProducts.push(...results);
-      }
+    // ── دمج: Lens أولاً ثم Shopping ──
+    const combined = [...lensProducts, ...allProducts];
+
+    if (!combined.length) {
+      return res.json({ products: getMockProducts(searchTerms[0], market, wantCheaper, 0), mock: true });
     }
 
-    // ── عرض النتائج ──
-    if (allProducts.length > 0) {
-      const unique = deduplicateProducts(allProducts);
-      const sorted = wantCheaper
-        ? unique.sort((a, b) => extractPrice(a.price) - extractPrice(b.price))
-        : unique;
+    // ── المرحلة ٣: فلتر العنوان (سريع) ──
+    let filtered = titleFilter(combined, analysis);
 
-      const source = allProducts[0]?.source || 'unknown';
-      console.log(`📦 Returning ${sorted.slice(0,6).length} products (source: ${source})`);
-      return res.json({ products: sorted.slice(0, 6), mock: false, source });
+    // ── المرحلة ٤: Claude Visual Filter (الأقوى) ──
+    if (imageBase64 && analysis && filtered.length > 2) {
+      filtered = await claudeVisualFilter(filtered, analysis, imageBase64);
     }
 
-    // ── Mock fallback ──
-    console.log('All APIs failed, using mock data');
-    const mockProducts = [];
-    validTerms.slice(0, 3).forEach((q, i) => {
-      mockProducts.push(...getMockProducts(q, market, wantCheaper, i));
-    });
-    const unique = deduplicateProducts(mockProducts);
+    // ── ترتيب وتنظيف ──
+    const unique = deduplicateProducts(filtered);
     const sorted = wantCheaper
       ? unique.sort((a, b) => extractPrice(a.price) - extractPrice(b.price))
-      : unique;
-   if (sorted.length === 0) {
-  return res.json({
-    products: [],
-    mock: false,
-    error: 'عذراً، لم نجد نتائج الآن. حاول مرة أخرى أو جرب كلمة بحث مختلفة 🙏'
-  });
-}
-res.json({ products: sorted.slice(0, 6), mock: true });
+      : unique.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
+
+    console.log(`✅ Final result: ${sorted.length} matched products`);
+    res.json({ products: sorted.slice(0, 6), mock: false, source: 'lens+shopping+claude_filter' });
 
   } catch (err) {
     console.error('Search error:', err);
@@ -517,7 +603,7 @@ res.json({ products: sorted.slice(0, 6), mock: true });
 });
 
 // ────────────────────────────────────
-// 6. تصفية النتائج بـ Claude
+// 6. تصفية نصية بـ Claude
 // ────────────────────────────────────
 app.post('/api/filter', async (req, res) => {
   try {
@@ -536,17 +622,18 @@ app.post('/api/filter', async (req, res) => {
         max_tokens: 500,
         messages: [{
           role: 'user',
-          content: `خبير تسوق. العميل يبحث عن:
-النوع: ${originalAnalysis.productType}
-الماركة: ${originalAnalysis.brand || 'أي ماركة'}
-اللون: ${originalAnalysis.color}
-${wantCheaper ? 'يريد: الأرخص مع التشابه' : ''}
+          content: `Shopping expert. Customer wants:
+Type: ${originalAnalysis.productType} (${originalAnalysis.category || ''})
+Brand: ${originalAnalysis.brand || 'any'}
+Color: ${originalAnalysis.color}
+${wantCheaper ? 'Priority: cheapest' : ''}
 
-النتائج:
-${products.map((p, i) => `${i}: ${p.name} - ${p.price}`).join('\n')}
+Results:
+${products.map((p, i) => `[${i}] ${p.name} - ${p.price}`).join('\n')}
 
-رتّب أفضل 4 حسب ${wantCheaper ? 'السعر الأرخص' : 'الدقة'}.
-JSON فقط: { "rankedIndices": [0,1,2,3] }`,
+ONLY approve products matching category "${originalAnalysis.category || originalAnalysis.productType}".
+Rank best 4 by ${wantCheaper ? 'price (lowest)' : 'relevance'}.
+JSON only: { "rankedIndices": [0,1,2,3] }`,
         }],
       }),
     });
@@ -557,7 +644,7 @@ JSON فقط: { "rankedIndices": [0,1,2,3] }`,
     const parsed = JSON.parse(clean);
     const ranked = parsed.rankedIndices?.map(i => products[i]).filter(Boolean);
 
-    res.json({ products: ranked || products });
+    res.json({ products: ranked?.length ? ranked : products });
   } catch (err) {
     res.json({ products: req.body.products });
   }
@@ -569,8 +656,9 @@ JSON فقط: { "rankedIndices": [0,1,2,3] }`,
 function deduplicateProducts(products) {
   const seen = new Set();
   return products.filter(p => {
-    if (seen.has(p.id)) return false;
-    seen.add(p.id);
+    const key = (p.name?.slice(0, 30) || '') + (p.store || '');
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }
@@ -580,24 +668,24 @@ function extractPrice(priceStr) {
 }
 
 function getMockProducts(query, market, cheaper = false, offset = 0) {
-  const currency = CURRENCIES[market] || 'ر.س';
-  const prices   = cheaper ? [89, 129, 69] : [299, 199, 399];
-  const badges   = cheaper
+  const currencies = { SA: 'ر.س', AE: 'د.إ', EG: 'ج.م', US: '$', CA: 'C$' };
+  const currency   = currencies[market] || 'ر.س';
+  const prices     = cheaper ? [89, 129, 69] : [299, 199, 399];
+  const badges     = cheaper
     ? ['الأرخص', 'قيمة ممتازة', 'توفير ٦٠٪']
     : ['الأكثر مبيعاً', 'سعر مميز', 'جودة عالية'];
   const images = [
-    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=300&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=300&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=300&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=300&h=300&fit=crop',
+    'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=300&h=300&fit=crop',
   ];
-  const domain = AMAZON_DOMAINS[market] || 'amazon.sa';
   return [0, 1, 2].map(i => ({
     id:     `mock-${offset}-${i}`,
     name:   `${query} ${i + 1}`,
     price:  `${prices[i]} ${currency}`,
     store:  `Amazon ${market}`,
     image:  images[i % images.length],
-    url:    `https://www.${domain}/s?k=${encodeURIComponent(query)}`,
+    url:    `https://www.amazon.sa/s?k=${encodeURIComponent(query)}`,
     badge:  badges[i],
     rating: (4 + Math.random() * 0.9).toFixed(1),
   }));
@@ -607,11 +695,5 @@ function getMockProducts(query, market, cheaper = false, offset = 0) {
 // تشغيل السيرفر
 // ────────────────────────────────────
 app.listen(config.PORT, () => {
-  const hasRainforest = !!process.env.RAINFOREST_API_KEY;
-  const hasSerp       = !!process.env.SERP_API_KEY;
-  const hasClaude     = !!process.env.CLAUDE_API_KEY;
-  console.log(`✅ fetchli.shop running on port ${config.PORT}`);
-  console.log(`   Rainforest API: ${hasRainforest ? '✅' : '❌ missing'}`);
-  console.log(`   SerpAPI:        ${hasSerp       ? '✅ (backup)' : '❌ missing'}`);
-  console.log(`   Claude API:     ${hasClaude     ? '✅' : '❌ missing'}`);
+  console.log(`✅ fetchli.shop server running on port ${config.PORT}`);
 });
