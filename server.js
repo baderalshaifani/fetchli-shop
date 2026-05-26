@@ -598,75 +598,223 @@ async function searchWithRainforest(query, market = 'SA', wantCheaper = false) {
   }
 }
 
-// ────────────────────────────────────
+// ════════════════════════════════════════════════════════
+// ★ Universal Search Engine
+// يقرأ كل تفاصيل المصدر من لوحة التحكم — لا يحتاج تعديل
+// لإضافة موقع جديد: أضفه من اللوحة فقط
+// ════════════════════════════════════════════════════════
+
+const crypto = require('crypto');
+
+// ── توليد signatures حسب النوع ──────────────────────────
+function buildAuth(source, params = {}) {
+  const appKey    = source.appKeyEnv    ? process.env[source.appKeyEnv]    : '';
+  const appSecret = source.appSecretEnv ? process.env[source.appSecretEnv] : '';
+
+  switch (source.authType) {
+
+    // AliExpress — MD5 signature
+    case 'aliexpress_md5': {
+      const allParams = { ...params, app_key: appKey };
+      const sortedKeys = Object.keys(allParams).sort();
+      let str = appSecret;
+      sortedKeys.forEach(k => { str += k + allParams[k]; });
+      str += appSecret;
+      const sign = crypto.createHash('md5').update(str).digest('hex').toUpperCase();
+      return { ...allParams, sign };
+    }
+
+    // HMAC-SHA256 (Coupang, eBay Partner, etc)
+    case 'hmac_sha256': {
+      const timestamp = Date.now().toString();
+      const strToSign = `${timestamp}
+${params.method || 'GET'}
+${source.searchUrl}`;
+      const sign = crypto.createHmac('sha256', appSecret).update(strToSign).digest('hex');
+      return { ...params, Authorization: `CEA algorithm=HmacSHA256, access-key=${appKey}, signed-date=${timestamp}, signature=${sign}` };
+    }
+
+    // Bearer Token (معظم REST APIs)
+    case 'bearer': {
+      return { ...params, _headers: { Authorization: `Bearer ${appKey}` } };
+    }
+
+    // API Key في الـ header
+    case 'api_key_header': {
+      const headerName = source.apiKeyHeader || 'X-API-Key';
+      return { ...params, _headers: { [headerName]: appKey } };
+    }
+
+    // API Key في الـ query
+    case 'api_key_query': {
+      const paramName = source.apiKeyParam || 'api_key';
+      return { ...params, [paramName]: appKey };
+    }
+
+    // بدون توثيق
+    case 'none':
+    default:
+      return params;
+  }
+}
+
+// ── استخراج المنتجات من أي رد JSON ──────────────────────
+// mapping مثال: "data.items" أو "result.products.product"
+function extractProducts(data, mapping) {
+  if (!mapping) return data?.products || data?.items || data?.results || [];
+  const keys = mapping.split('.');
+  let current = data;
+  for (const key of keys) {
+    if (current == null) return [];
+    current = current[key];
+  }
+  return Array.isArray(current) ? current : [];
+}
+
+// ── تحويل منتج خام لصيغة fetchli الموحّدة ──────────────
+function normalizeProduct(item, source, index) {
+  const m = source.fieldMapping || {};
+  // يقرأ اسم الحقل من الـ mapping أو يجرب الأسماء الشائعة
+  const get = (field, fallbacks) => {
+    if (m[field]) return getNestedValue(item, m[field]);
+    for (const fb of fallbacks) {
+      const v = getNestedValue(item, fb);
+      if (v != null && v !== '') return v;
+    }
+    return null;
+  };
+
+  const price = get('price', ['sale_price','price','current_price','selling_price','originalPrice']);
+  const currency = get('currency', ['currency','target_currency']) || 'USD';
+
+  return {
+    id:         `${source.id}-${index}-${Date.now()}`,
+    name:       (get('name',  ['product_title','title','name','productName','subject']) || '').slice(0, 70),
+    price:      price ? `${price} ${currency}` : 'تحقق من السعر',
+    store:      source.name,
+    image:      get('image', ['product_main_image_url','image','thumbnail','imageUrl','main_image']),
+    url:        get('url',   ['product_detail_url','url','link','detailUrl','productUrl']) || source.searchUrl,
+    badge:      index === 0 ? `${source.icon} ${source.name}` : '',
+    rating:     formatRating(get('rating', ['evaluate_rate','rating','score','star'])),
+    source:     source.id,
+    matchScore: 75 - index * 3,
+  };
+}
+
+function getNestedValue(obj, path) {
+  if (!path || !obj) return null;
+  return path.split('.').reduce((o, k) => (o == null ? null : o[k]), obj);
+}
+
+function formatRating(raw) {
+  if (!raw) return (4 + Math.random() * 0.9).toFixed(1);
+  const n = parseFloat(raw);
+  if (isNaN(n)) return '4.5';
+  // بعض APIs ترجع النسبة المئوية (مثل 95%) بدل من 5
+  return n > 10 ? (n / 20).toFixed(1) : n.toFixed(1);
+}
+
+// ── Universal Search ──────────────────────────────────────
+async function universalSearch(source, query, market, wantCheaper) {
+  try {
+    const appKey    = source.appKeyEnv    ? process.env[source.appKeyEnv]    : '';
+    const appSecret = source.appSecretEnv ? process.env[source.appSecretEnv] : '';
+
+    if (source.appKeyEnv && !appKey) {
+      console.log(`${source.name}: missing key ${source.appKeyEnv}`);
+      return null;
+    }
+
+    // بناء query parameters الأساسية
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const baseParams = {
+      // حقول قياسية — يمكن تخصيصها من source.queryParams
+      ...(source.queryParams || {}),
+      // inject اسم الـ query حسب ما يسميه كل API
+      [source.queryParam || 'keywords']: wantCheaper ? `${query} budget` : query,
+    };
+
+    // أضف timestamp لـ AliExpress-style APIs
+    if (source.authType === 'aliexpress_md5') {
+      baseParams.method    = source.apiMethod || 'aliexpress.affiliate.product.query';
+      baseParams.app_key   = appKey;
+      baseParams.timestamp = timestamp;
+      baseParams.format    = 'json';
+      baseParams.v         = '2.0';
+      baseParams.sign_method = 'md5';
+    }
+
+    // توليد التوثيق
+    const authParams = buildAuth(source, baseParams);
+    const headers    = authParams._headers || {};
+    delete authParams._headers;
+
+    // بناء URL النهائي
+    const params = new URLSearchParams(authParams);
+    const url    = `${source.searchUrl}?${params}`;
+
+    console.log(`${source.icon} ${source.name}: searching "${query}"`);
+    const response = await fetch(url, {
+      headers: { 'Content-Type': 'application/json', ...headers },
+      signal: AbortSignal.timeout((source.timeout || 12) * 1000),
+    });
+
+    const data = await response.json();
+
+    // استخراج المنتجات حسب responseMapping
+    const rawProducts = extractProducts(data, source.responseMapping);
+    if (!rawProducts.length) {
+      console.log(`${source.name}: no results for "${query}"`);
+      return null;
+    }
+
+    console.log(`${source.name}: ${rawProducts.length} results`);
+    return rawProducts.slice(0, 6).map((item, i) => normalizeProduct(item, source, i));
+
+  } catch (err) {
+    console.error(`${source.name} error:`, err.message);
+    return null;
+  }
+}
+
+// ════════════════════════════════════════════════════════
 // 5. البحث الرئيسي — يقرأ المصادر من adminConfig
 // تفعيل/تعطيل أي مصدر من لوحة التحكم يؤثر فوراً
-// ────────────────────────────────────
-
-// router: يوجّه كل مصدر لدالته المناسبة
+// ════════════════════════════════════════════════════════
 async function runSource(source, { queries, imageBase64, market, wantCheaper }) {
   const validTerms = queries.filter(q => q?.trim().length > 0);
 
   // تحقق أن السوق مدعوم
-  if (source.markets?.length && !source.markets.includes(market)) {
-    console.log(`Source ${source.name}: market ${market} not supported, skipping`);
-    return [];
-  }
+  if (source.markets?.length && !source.markets.includes(market)) return [];
 
   try {
-    switch (source.type) {
-
-      case 'serpapi_lens': {
-        if (!imageBase64) return [];
-        const result = await searchWithGoogleLens(imageBase64, market);
-        return result?.products || [];
-      }
-
-      case 'serpapi_shopping': {
-        const results = [];
-        for (const q of validTerms.slice(0, 3)) {
-          const r = await searchWithGoogleShopping(
-            wantCheaper ? `${q} budget affordable` : q, market
-          );
-          if (r?.length) results.push(...r);
-        }
-        return results;
-      }
-
-      case 'rainforest': {
-        const results = [];
-        for (const q of validTerms.slice(0, 2)) {
-          const r = await searchWithRainforest(q, market, wantCheaper);
-          if (r?.length) results.push(...r);
-        }
-        return results;
-      }
-
-      case 'direct_api': {
-        if (!source.url) return [];
-        const results = [];
-        for (const q of validTerms.slice(0, 2)) {
-          try {
-            const r = await fetch(
-              `${source.url}?q=${encodeURIComponent(q)}&market=${market}`,
-              { signal: AbortSignal.timeout((source.timeout || 10) * 1000) }
-            );
-            const d = await r.json();
-            if (d.products?.length) results.push(...d.products.slice(0, 6).map((p, i) => ({
-              id: `direct-${source.id}-${i}`, name: p.name || p.title,
-              price: p.price, store: source.name,
-              image: p.image || p.thumbnail, url: p.url || p.link,
-              rating: p.rating, source: source.id, matchScore: 65 - i * 3,
-            })));
-          } catch (e) { console.error(`Direct API ${source.name}:`, e.message); }
-        }
-        return results;
-      }
-
-      default:
-        console.log(`Unknown source type: ${source.type}`);
-        return [];
+    // ── مصادر SerpAPI (تحتاج منطق خاص للصورة) ──
+    if (source.type === 'serpapi_lens') {
+      if (!imageBase64) return [];
+      const result = await searchWithGoogleLens(imageBase64, market);
+      return result?.products || [];
     }
+
+    if (source.type === 'serpapi_shopping') {
+      const results = [];
+      for (const q of validTerms.slice(0, 3)) {
+        const r = await searchWithGoogleShopping(
+          wantCheaper ? `${q} budget affordable` : q, market
+        );
+        if (r?.length) results.push(...r);
+      }
+      return results;
+    }
+
+    // ── كل المصادر الأخرى → Universal Engine ──
+    // AliExpress, Rainforest, Coupang, eBay, أي API جديد...
+    const results = [];
+    for (const q of validTerms.slice(0, 2)) {
+      const r = await universalSearch(source, q, market, wantCheaper);
+      if (r?.length) results.push(...r);
+    }
+    return results;
+
   } catch (err) {
     console.error(`Source ${source.name} failed:`, err.message);
     return [];
@@ -890,13 +1038,18 @@ app.post('/api/admin/auth', (req, res) => {
 
 // ── Admin Config — محفوظ في ملف JSON دائم ──
 const fs         = require('fs');
-const CONFIG_PATH = path.join(__dirname, 'admin-config.json');
+// /var/data هو الـ Disk mount path على Render
+// محلياً يحفظ بجانب server.js
+const CONFIG_PATH = process.env.RENDER
+  ? '/var/data/admin-config.json'
+  : path.join(__dirname, 'admin-config.json');
 
 const DEFAULT_CONFIG = {
   sources: [
     { id:'serp-lens',     name:'Google Lens',       icon:'🔍', type:'serpapi_lens',    url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:true,  notes:'البحث البصري المباشر — الأدق' },
     { id:'serp-shopping', name:'Google Shopping',    icon:'🛍️', type:'serpapi_shopping', url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:true,  notes:'بحث بكلمات في Google Shopping' },
-    { id:'rainforest',    name:'Amazon (Rainforest)',icon:'📦', type:'rainforest',       url:'https://api.rainforestapi.com/request', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:false, notes:'بيانات Amazon المباشرة' },
+    { id:'rainforest', name:'Amazon (Rainforest)', icon:'📦', type:'rainforest', searchUrl:'https://api.rainforestapi.com/request', url:'', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:false, authType:'api_key_query', appKeyEnv:'RAINFOREST_API_KEY', queryParam:'search_term', responseMapping:'search_results', fieldMapping:{name:'title',price:'price.raw',image:'image',url:'link',rating:'rating'}, notes:'بيانات Amazon المباشرة' },
+    { id:'aliexpress', name:'AliExpress', icon:'🛒', type:'aliexpress', searchUrl:'https://api-sg.aliexpress.com/sync', url:'', priority:4, markets:['SA','AE','EG','US','KW','QA'], categories:[], rateLimit:1000, timeout:12, active:false, authType:'aliexpress_md5', appKeyEnv:'ALIEXPRESS_APP_KEY', appSecretEnv:'ALIEXPRESS_APP_SECRET', queryParam:'keywords', apiMethod:'aliexpress.affiliate.product.query', responseMapping:'aliexpress_affiliate_product_query_response.resp_result.result.products.product', fieldMapping:{name:'product_title',price:'sale_price',image:'product_main_image_url',url:'product_detail_url',rating:'evaluate_rate'}, notes:'AliExpress Affiliate API — يدعم جميع الدول' },
   ],
   markets: [
     { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
@@ -1239,6 +1392,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
           <option value="serpapi_lens">SerpAPI Lens</option>
           <option value="serpapi_shopping">SerpAPI Shopping</option>
           <option value="rainforest">Rainforest (Amazon)</option>
+          <option value="aliexpress">AliExpress Affiliate</option>
           <option value="direct_api">API مباشر</option>
           <option value="affiliate">Affiliate Feed</option>
         </select>
@@ -1257,6 +1411,48 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:1
       </div>
       <div class="form-group"><label class="form-label">حد يومي</label><input class="form-input" id="src-limit" type="number" placeholder="250"></div>
       <div class="form-group"><label class="form-label">Timeout (ثانية)</label><input class="form-input" id="src-timeout" type="number" placeholder="10"></div>
+      <div class="form-group form-full" style="background:rgba(124,106,247,.06);border:1px solid rgba(124,106,247,.2);border-radius:8px;padding:16px">
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:12px">🔐 إعدادات التوثيق — للمصادر الجديدة</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">نوع التوثيق (authType)</label>
+            <select class="form-select" id="src-auth-type">
+              <option value="none">بدون توثيق</option>
+              <option value="aliexpress_md5">AliExpress MD5</option>
+              <option value="bearer">Bearer Token</option>
+              <option value="api_key_query">API Key (query param)</option>
+              <option value="api_key_header">API Key (header)</option>
+              <option value="hmac_sha256">HMAC SHA256</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">اسم متغير الـ App Key في Render</label>
+            <input class="form-input" id="src-app-key-env" placeholder="ALIEXPRESS_APP_KEY">
+          </div>
+          <div class="form-group">
+            <label class="form-label">اسم متغير الـ Secret في Render</label>
+            <input class="form-input" id="src-app-secret-env" placeholder="ALIEXPRESS_APP_SECRET">
+          </div>
+          <div class="form-group">
+            <label class="form-label">اسم حقل الـ query في الـ API</label>
+            <input class="form-input" id="src-query-param" placeholder="keywords أو q أو search_term">
+          </div>
+          <div class="form-group">
+            <label class="form-label">مسار المنتجات في الرد (responseMapping)</label>
+            <input class="form-input" id="src-response-mapping" placeholder="مثال: data.items أو result.products.product">
+            <span class="form-hint">المسار داخل JSON للوصول لقائمة المنتجات</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">API Method (للـ AliExpress)</label>
+            <input class="form-input" id="src-api-method" placeholder="aliexpress.affiliate.product.query">
+          </div>
+        </div>
+        <div style="margin-top:12px">
+          <label class="form-label">تخصيص حقول المنتج (fieldMapping) — JSON</label>
+          <textarea class="form-textarea" id="src-field-mapping" style="min-height:60px;font-family:var(--mono);font-size:12px" placeholder='{"name":"product_title","price":"sale_price","image":"product_main_image_url","url":"product_detail_url"}'></textarea>
+          <span class="form-hint">اختياري — إذا أسماء الحقول مختلفة عن القياسية</span>
+        </div>
+      </div>
       <div class="form-group form-full"><label class="form-label">ملاحظات</label><textarea class="form-textarea" id="src-notes"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -1422,9 +1618,16 @@ async function editSource(id) {
   document.getElementById('src-type').value    = s.type;
   document.getElementById('src-priority').value= s.priority;
   document.getElementById('src-url').value     = s.url||'';
-  document.getElementById('src-limit').value   = s.rateLimit||250;
-  document.getElementById('src-timeout').value = s.timeout||10;
-  document.getElementById('src-notes').value   = s.notes||'';
+  document.getElementById('src-limit').value         = s.rateLimit||250;
+  document.getElementById('src-timeout').value       = s.timeout||10;
+  document.getElementById('src-notes').value         = s.notes||'';
+  document.getElementById('src-auth-type').value     = s.authType||'none';
+  document.getElementById('src-app-key-env').value   = s.appKeyEnv||'';
+  document.getElementById('src-app-secret-env').value= s.appSecretEnv||'';
+  document.getElementById('src-query-param').value   = s.queryParam||'';
+  document.getElementById('src-response-mapping').value = s.responseMapping||'';
+  document.getElementById('src-api-method').value    = s.apiMethod||'';
+  document.getElementById('src-field-mapping').value = s.fieldMapping ? JSON.stringify(s.fieldMapping) : '';
   clearChips('src-cats-chips','src-cat-in');
   s.categories?.forEach(c=>addChipValue('src-cats-chips',c));
   renderMarketsCheckboxes(s.markets);
@@ -1446,6 +1649,13 @@ async function saveSource() {
     rateLimit: parseInt(document.getElementById('src-limit').value)||250,
     timeout:   parseInt(document.getElementById('src-timeout').value)||10,
     notes:     document.getElementById('src-notes').value.trim(),
+    authType:        document.getElementById('src-auth-type').value||'none',
+    appKeyEnv:       document.getElementById('src-app-key-env').value.trim()||null,
+    appSecretEnv:    document.getElementById('src-app-secret-env').value.trim()||null,
+    queryParam:      document.getElementById('src-query-param').value.trim()||'keywords',
+    responseMapping: document.getElementById('src-response-mapping').value.trim()||null,
+    apiMethod:       document.getElementById('src-api-method').value.trim()||null,
+    fieldMapping: (() => { try { const v=document.getElementById('src-field-mapping').value.trim(); return v?JSON.parse(v):null; } catch(e){ return null; } })(),
     active:    true,
   };
   const r = await fetch('/api/admin/config', {headers:H});
@@ -1628,7 +1838,7 @@ async function renderStats() {
 function openModal(id) {
   if(id==='addSource'&&!editSrcId){
     document.getElementById('src-modal-title').textContent='إضافة مصدر جديد';
-    ['src-name','src-icon','src-url','src-limit','src-timeout','src-notes'].forEach(f=>document.getElementById(f).value='');
+    ['src-name','src-icon','src-url','src-limit','src-timeout','src-notes','src-app-key-env','src-app-secret-env','src-query-param','src-response-mapping','src-api-method','src-field-mapping'].forEach(f=>document.getElementById(f).value='');
     clearChips('src-cats-chips','src-cat-in');
     renderMarketsCheckboxes(['SA','AE']);
   }
