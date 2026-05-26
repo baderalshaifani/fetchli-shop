@@ -76,6 +76,13 @@ async function sendMessage(text, imageBase64 = null) {
     });
     const analyzed = await analyzeRes.json();
 
+    // ── لو الصورة غير واضحة — اطلب توضيح ──
+    if (analyzed.needsClarification) {
+      removeTyping();
+      addMessage('ai', analyzed.reply);
+      return;
+    }
+
     updateTyping('جاري البحث في المتاجر...');
 
     // ── المرحلة ٢: بحث متعدد بـ 5 كلمات ──
@@ -109,16 +116,26 @@ async function sendMessage(text, imageBase64 = null) {
 
     removeTyping();
 
+    // ── لو ما في نتائج — رسالة واضحة بدون mock ──
+    if (!finalProducts?.length) {
+      addMessage('ai', `لم أجد منتجات مطابقة حالياً 😔
+
+جرّب:
+• وصف المنتج بكلمات أبسط
+• إرسال صورة المنتج مباشرة بدون خلفية
+• البحث بالاسم مباشرة`);
+      return;
+    }
+
     // ── عرض النتائج ──
     const confidence = analyzed.confidence || 90;
     const reply = analyzed.reply || `وجدت لك ${finalProducts.length} منتجات مطابقة`;
     const detailLine = analyzed.productType
       ? `\n🔍 ${analyzed.productType}${analyzed.brand ? ` • ${analyzed.brand}` : ''}${analyzed.color ? ` • ${analyzed.color}` : ''}`
       : '';
-    const mockNote = mock ? '\n\n_نتائج تجريبية — سيتم ربط Amazon قريباً_' : '';
     const accuracyNote = `\n✦ دقة التطابق: ${confidence}٪`;
 
-    addMessage('ai', reply + detailLine + accuracyNote + mockNote);
+    addMessage('ai', reply + detailLine + accuracyNote);
 
     if (finalProducts?.length > 0) addProducts(finalProducts, wantCheaper);
 

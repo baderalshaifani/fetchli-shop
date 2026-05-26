@@ -399,6 +399,29 @@ app.post('/api/analyze', async (req, res) => {
       }
     }
 
+    // ── تحقق من جودة الصورة ──
+    if (imageBase64 && visionData) {
+      const visionText = [
+        visionData.bestGuess || '',
+        ...(visionData.labels || []),
+        ...(visionData.objects || []),
+      ].join(' ').toLowerCase();
+
+      // لو Vision شاف screenshot أو ما عرف منتجاً واضحاً
+      const isScreenshot = visionText.includes('screenshot') || visionText.includes('web page') || visionText.includes('website') || visionText.includes('software') || visionText.includes('computer');
+      const hasProduct   = visionData.objects?.length > 0 || visionData.logos?.length > 0 || visionData.bestGuess;
+
+      if (isScreenshot || !hasProduct) {
+        console.log('Vision: unclear image — asking user for clarification');
+        return res.json({
+          needsClarification: true,
+          reply: 'الصورة غير واضحة أو تحتوي على محتوى رقمي (screenshot). أرسل صورة المنتج مباشرة بخلفية بيضاء أو صافية، أو صف المنتج الذي تبحث عنه.',
+          searchQueries: [],
+          confidence: 0,
+        });
+      }
+    }
+
     // ── المرحلة 2: Claude تحليل عميق بكل المعلومات ──
     let analyzed = null;
     try {
@@ -959,7 +982,9 @@ app.post('/api/search', async (req, res) => {
     }
 
     if (!allProducts.length) {
-      return res.json({ products: getMockProducts(searchTerms[0], market, wantCheaper, 0), mock: true });
+      // لا نرجع نتائج وهمية — نرجع رسالة واضحة
+      console.log('No results from any source');
+      return res.json({ products: [], mock: false, noResults: true });
     }
 
     // ── فلتر العنوان (دائماً — حتى لو منتج واحد) ──
