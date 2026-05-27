@@ -370,7 +370,14 @@ function buildFallbackFromVision(visionData, message, wantCheaper) {
 // ────────────────────────────────────
 app.post('/api/analyze', async (req, res) => {
   try {
-    const { message, imageBase64, wantCheaper = false } = req.body;
+    let { message, imageBase64, wantCheaper = false } = req.body;
+
+    // لو المستخدم نسخ اسم منتج طويل — خذ أول 5 كلمات فقط
+    if (message && message.split(' ').length > 6) {
+      const shortened = message.split(' ').slice(0, 5).join(' ');
+      console.log(`Message shortened: "${message.slice(0,50)}" → "${shortened}"`);
+      message = shortened;
+    }
 
     // ── المرحلة 1: Vision + Lens معاً (للتعرف فقط) ──
     let visionData  = null;
@@ -1184,7 +1191,7 @@ const DEFAULT_CONFIG = {
     { id:'serp-lens',     name:'Google Lens',       icon:'🔍', type:'serpapi_lens',    url:'', priority:1, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:15, active:false,  notes:'البحث البصري المباشر — الأدق' },
     { id:'serp-shopping', name:'Google Shopping',    icon:'🛍️', type:'serpapi_shopping', url:'', priority:2, markets:['SA','AE','EG','US'], categories:[], rateLimit:250, timeout:10, active:false,  notes:'بحث بكلمات في Google Shopping' },
     { id:'rainforest', name:'Amazon (Rainforest)', icon:'📦', type:'rainforest', searchUrl:'https://api.rainforestapi.com/request', url:'', priority:3, markets:['SA','AE','US'], categories:[], rateLimit:500, timeout:12, active:true, authType:'api_key_query', appKeyEnv:'RAINFOREST_API_KEY', queryParam:'search_term', responseMapping:'search_results', fieldMapping:{name:'title',price:'price.raw',image:'image',url:'link',rating:'rating'}, notes:'بيانات Amazon المباشرة' },
-    { id:'aliexpress', name:'AliExpress', icon:'🛒', type:'aliexpress', searchUrl:'https://api-sg.aliexpress.com/sync', url:'', priority:4, markets:['SA','AE','EG','US','KW','QA'], categories:[], rateLimit:1000, timeout:12, active:true, authType:'aliexpress_md5', appKeyEnv:'ALIEXPRESS_APP_KEY', appSecretEnv:'ALIEXPRESS_APP_SECRET', queryParam:'keywords', apiMethod:'aliexpress.affiliate.product.query', responseMapping:'aliexpress_affiliate_product_query_response.resp_result.result.products.product', fieldMapping:{name:'product_title',price:'sale_price',image:'product_main_image_url',url:'product_detail_url',rating:'evaluate_rate'}, queryParams:{page_no:'1',page_size:'20',tracking_id:'fetchli',target_currency:'USD',target_language:'EN',fields:'product_id,product_title,sale_price,sale_price_currency,product_main_image_url,product_detail_url,evaluate_rate,lastest_volume'}, notes:'AliExpress Affiliate API — يدعم جميع الدول' },
+    { id:'aliexpress', name:'AliExpress', icon:'🛒', type:'aliexpress', searchUrl:'https://api-sg.aliexpress.com/sync', url:'', priority:4, markets:['SA','AE','EG','US','KW','QA'], categories:[], rateLimit:1000, timeout:12, active:true, authType:'aliexpress_md5', appKeyEnv:'ALIEXPRESS_APP_KEY', appSecretEnv:'ALIEXPRESS_APP_SECRET', queryParam:'keywords', apiMethod:'aliexpress.affiliate.product.query', responseMapping:'aliexpress_affiliate_product_query_response.resp_result.result.products.product', fieldMapping:{name:'product_title',price:'sale_price',image:'product_main_image_url',url:'product_detail_url',rating:'evaluate_rate'}, queryParams:{page_no:'1',page_size:'6',tracking_id:'fetchli',target_currency:'USD',target_language:'AR',fields:'product_id,product_title,sale_price,sale_price_currency,product_main_image_url,product_detail_url,evaluate_rate,lastest_volume'}, notes:'AliExpress Affiliate API — يدعم جميع الدول' },
   ],
   markets: [
     { country:'SA', flag:'🇸🇦', name:'السعودية', currency:'SAR', market:'SA', active:true },
