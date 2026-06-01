@@ -2,11 +2,12 @@
 // fetchli.shop — الباك اند
 // ===================================
 
-const express = require('express');
-const cors    = require('cors');
-const fetch   = require('node-fetch');
-const path    = require('path');
-const config  = require('./config');
+const express  = require('express');
+const cors     = require('cors');
+const fetch    = require('node-fetch');
+const path     = require('path');
+const crypto   = require('crypto');
+const config   = require('./config');
 
 const app = express();
 app.use(cors());
@@ -14,7 +15,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ────────────────────────────────────
-// 1. تحديد دولة المستخدم عبر IP
+// 1. تحديد دولة المستخدم
 // ────────────────────────────────────
 app.get('/api/location', async (req, res) => {
   try {
@@ -42,7 +43,7 @@ app.get('/api/location', async (req, res) => {
 });
 
 // ────────────────────────────────────
-// 2. Google Vision — تحليل بصري
+// 2. Google Vision
 // ────────────────────────────────────
 async function analyzeWithGoogleVision(imageBase64) {
   try {
@@ -52,17 +53,18 @@ async function analyzeWithGoogleVision(imageBase64) {
     const response = await fetch(
       `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_KEY}`,
       {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requests: [{
             image: { content: imageBase64 },
             features: [
-              { type: 'LABEL_DETECTION',    maxResults: 15 },
-              { type: 'LOGO_DETECTION',     maxResults: 5  },
-              { type: 'OBJECT_LOCALIZATION',maxResults: 10 },
-              { type: 'IMAGE_PROPERTIES',   maxResults: 5  },
-              { type: 'WEB_DETECTION',      maxResults: 10 },
+              { type: 'LABEL_DETECTION',     maxResults: 15 },
+              { type: 'LOGO_DETECTION',      maxResults: 5  },
+              { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
+              { type: 'IMAGE_PROPERTIES',    maxResults: 5  },
+              { type: 'WEB_DETECTION',       maxResults: 10 },
+              { type: 'TEXT_DETECTION',      maxResults: 1  }, // لقراءة نصوص التذاكر
             ],
           }],
         }),
@@ -77,9 +79,9 @@ async function analyzeWithGoogleVision(imageBase64) {
     const logos       = result.logoAnnotations?.map(l => l.description)  || [];
     const objects     = result.localizedObjectAnnotations?.map(o => o.name) || [];
     const webEntities = result.webDetection?.webEntities
-      ?.filter(e => e.score > 0.5)
-      ?.map(e => e.description) || [];
+      ?.filter(e => e.score > 0.5)?.map(e => e.description) || [];
     const bestGuess   = result.webDetection?.bestGuessLabels?.[0]?.label || '';
+    const fullText    = result.textAnnotations?.[0]?.description || ''; // النص الكامل من الصورة
     const colors      = result.imagePropertiesAnnotation?.dominantColors?.colors
       ?.slice(0, 3)
       ?.map(c => rgbToColorName(
@@ -88,7 +90,7 @@ async function analyzeWithGoogleVision(imageBase64) {
         Math.round(c.color.blue  || 0)
       )) || [];
 
-    return { labels, logos, objects, webEntities, bestGuess, colors };
+    return { labels, logos, objects, webEntities, bestGuess, colors, fullText };
   } catch (err) {
     console.error('Google Vision error:', err);
     return null;
@@ -112,7 +114,7 @@ function rgbToColorName(r, g, b) {
 }
 
 // ────────────────────────────────────
-// 3. Claude — تحليل عميق + كلمات بحث
+// 3. Claude — تحليل ذكي شامل
 // ────────────────────────────────────
 async function analyzeWithClaude(message, imageBase64, visionData, wantCheaper) {
   const content = [];
@@ -132,42 +134,64 @@ Google Vision data:
 - Web entities: ${visionData.webEntities.slice(0, 5).join(', ') || 'none'}
 - Best guess: ${visionData.bestGuess || 'none'}
 - Colors: ${visionData.colors.join(', ') || 'none'}
+- Text in image: ${visionData.fullText?.slice(0, 300) || 'none'}
 ` : '';
-
-  const cheaperNote = wantCheaper
-    ? 'User wants cheaper alternatives — focus on: alternative, dupe, budget, affordable, similar'
-    : '';
 
   content.push({
     type: 'text',
-    text: `You are a professional shopping search expert.
-${imageBase64 ? 'Carefully analyze the image and identify EXACTLY what product is shown.' : ''}
+    text: `You are fetchli — an intelligent universal search assistant. You understand ANY request in ANY language and find the best results.
+
+${imageBase64 ? 'Analyze the image carefully.' : ''}
 ${visionContext}
 ${message ? `User request: "${message}"` : ''}
-${cheaperNote}
+${wantCheaper ? 'User wants cheaper alternatives.' : ''}
 
-RULES:
-- Watch image → productType "ساعة", search watches only
-- Bag image → productType "حقيبة", search bags only  
-- Shoes image → productType "حذاء", search shoes only
-- Never mix categories
+STEP 1 — Determine request type:
+- "product": physical item to buy (clothes, electronics, cosmetics, food supplements, hair products, skincare, etc.)
+- "hotel": hotel or accommodation search
+- "flight": flight ticket search  
+- "other": anything else
 
-Create 5 SHORT English search queries (max 4 words each) suitable for e-commerce search:
-- Query 1: brand + type + color (e.g. "Rolex watch black")
-- Query 2: type + color + material (e.g. "leather watch brown")
-- Query 3: type + style (e.g. "luxury dress watch")
-- Query 4: ${wantCheaper ? 'budget similar type' : 'type + key feature'}
-- Query 5: general type only (e.g. "watch", "bag", "shoes")
+STEP 2 — For PRODUCTS, understand even indirect requests:
+- "تساقط شعر" / "hair loss" → hair loss shampoo/treatment/serum
+- "تبييض أسنان" → teeth whitening products
+- "كريم مبيض" → whitening cream/serum
+- "آلام ظهر" → back pain relief products
+- "نوم أفضل" → sleep aid/melatonin/pillow
+- "رجيم" / "diet" → weight loss supplements
+- "بشرة جافة" → moisturizer/dry skin cream
+- Always map the PROBLEM to the PRODUCT SOLUTION
 
-Respond ONLY with valid JSON:
+STEP 3 — Generate 5 short English search queries (max 5 words each):
+- Query 1: most specific (brand + product + key feature)
+- Query 2: problem-solution focused
+- Query 3: category + top feature
+- Query 4: ${wantCheaper ? 'budget affordable alternative' : 'premium/best version'}
+- Query 5: general category (1-2 words only)
+
+STEP 4 — For FLIGHTS (from image or text), extract:
+- from: departure city/airport
+- to: destination city/airport  
+- date: travel date
+- passengers: number
+
+STEP 5 — For HOTELS, extract:
+- city: destination
+- checkIn / checkOut dates
+- guests: number
+
+Respond ONLY with JSON:
 {
-  "productType": "نوع المنتج بالعربي",
+  "searchType": "product|hotel|flight|other",
+  "productType": "نوع المنتج أو الخدمة بالعربي",
   "brand": "brand or null",
-  "color": "main color",
-  "material": "material",
+  "color": "color or null",
+  "material": "material or null",
   "details": "key features",
   "searchQueries": ["q1","q2","q3","q4","q5"],
-  "reply": "رد ودي قصير بالعربي",
+  "flightData": { "from": null, "to": null, "date": null, "passengers": 1 },
+  "hotelData": { "city": null, "checkIn": null, "checkOut": null, "guests": 1 },
+  "reply": "رد ودي قصير بالعربي يوضح ما فهمته",
   "confidence": 90
 }`,
   });
@@ -182,7 +206,7 @@ Respond ONLY with valid JSON:
     body: JSON.stringify({
       model:      'claude-sonnet-4-20250514',
       max_tokens: 800,
-      system:     'You are a product analysis API. Respond with valid JSON only. No markdown, no code blocks.',
+      system:     'You are a universal search API. Respond with valid JSON only. No markdown, no explanation.',
       messages:   [
         { role: 'user',      content },
         { role: 'assistant', content: [{ type: 'text', text: '{' }] },
@@ -199,45 +223,49 @@ Respond ONLY with valid JSON:
 }
 
 // ────────────────────────────────────
-// Fallback إذا فشل Claude
+// Fallback
 // ────────────────────────────────────
-function buildFallbackFromVision(visionData, message, wantCheaper) {
-  if (!visionData) {
-    return {
-      productType: message || 'منتج',
-      brand: null, color: '',
-      searchQueries: [message || 'product'],
-      reply: 'جاري البحث...', confidence: 60,
-    };
+function buildFallback(visionData, message, wantCheaper) {
+  if (!visionData && !message) {
+    return { searchType: 'product', productType: 'منتج', brand: null, color: '',
+      searchQueries: ['product'], reply: 'جاري البحث...', confidence: 60 };
   }
-  const brand   = visionData.logos?.[0] || null;
-  const guess   = visionData.bestGuess  || '';
-  const objects = visionData.objects?.join(' ') || '';
-  const labels  = visionData.labels?.slice(0, 5).join(' ') || '';
-  const color   = visionData.colors?.[0] || '';
+
+  const brand   = visionData?.logos?.[0] || null;
+  const guess   = visionData?.bestGuess  || message || '';
+  const color   = visionData?.colors?.[0] || '';
+  const objects = visionData?.objects?.join(' ') || '';
+  const labels  = visionData?.labels?.slice(0, 5).join(' ') || '';
 
   const productMap = {
-    'watch':'ساعة','clock':'ساعة','bag':'حقيبة','handbag':'حقيبة',
-    'shoe':'حذاء','sneaker':'حذاء','shirt':'قميص','dress':'فستان',
+    'watch':'ساعة','bag':'حقيبة','shoe':'حذاء','shirt':'قميص',
     'phone':'جوال','laptop':'لابتوب','headphone':'سماعة',
+    'hair':'شعر','cream':'كريم','shampoo':'شامبو',
+    'ticket':'تذكرة','boarding':'تذكرة طيران','hotel':'فندق',
   };
+
   let productType = 'منتج';
-  const allText = (guess + ' ' + objects + ' ' + labels).toLowerCase();
+  const allText = (guess + ' ' + objects + ' ' + labels + ' ' + (message||'')).toLowerCase();
   for (const [en, ar] of Object.entries(productMap)) {
     if (allText.includes(en)) { productType = ar; break; }
   }
 
+  // كشف نوع الطلب
+  let searchType = 'product';
+  if (/hotel|فندق|إقامة|accommodation/i.test(allText)) searchType = 'hotel';
+  if (/flight|ticket|تذكرة|طيران|boarding/i.test(allText)) searchType = 'flight';
+
   const q1 = [brand, guess, color].filter(Boolean).join(' ').trim() || message || 'product';
-  const q2 = [guess, color].filter(Boolean).join(' ').trim() || q1;
-  const q3 = wantCheaper ? `${guess} budget` : `${guess} buy`;
-  const q4 = brand ? `${brand} ${guess}` : guess;
-  const q5 = message || guess || 'product';
+  const q2 = message || guess || q1;
+  const q3 = wantCheaper ? `${guess} budget` : `best ${guess}`;
+  const q4 = brand ? `${brand} ${guess}` : `${guess} online`;
+  const q5 = guess.split(' ')[0] || 'product';
 
   return {
-    productType, brand, color, details: objects,
-    searchQueries: [q1,q2,q3,q4,q5].filter(q => q && q.trim().length > 1),
-    reply: `وجدت ${productType}${brand ? ' من ' + brand : ''} — جاري البحث`,
-    confidence: 75,
+    searchType, productType, brand, color, details: objects,
+    searchQueries: [q1,q2,q3,q4,q5].filter(q => q?.trim().length > 1),
+    reply: `جاري البحث عن ${productType}...`,
+    confidence: 70,
   };
 }
 
@@ -251,18 +279,19 @@ app.post('/api/analyze', async (req, res) => {
     let visionData = null;
     if (imageBase64) {
       visionData = await analyzeWithGoogleVision(imageBase64);
-      console.log('Vision:', visionData?.bestGuess, '| Logos:', visionData?.logos);
+      console.log('Vision:', visionData?.bestGuess, '| Text:', visionData?.fullText?.slice(0,50));
     }
 
     let analyzed = null;
     try {
       analyzed = await analyzeWithClaude(message, imageBase64, visionData, wantCheaper);
+      console.log('Claude searchType:', analyzed.searchType, '| queries:', analyzed.searchQueries?.slice(0,2));
     } catch (e) {
       console.error('Claude failed:', e.message);
     }
 
     if (!analyzed?.searchQueries?.length) {
-      analyzed = buildFallbackFromVision(visionData, message, wantCheaper);
+      analyzed = buildFallback(visionData, message, wantCheaper);
     }
 
     if (visionData?.logos?.length > 0 && analyzed.brand) {
@@ -272,39 +301,31 @@ app.post('/api/analyze', async (req, res) => {
     res.json({ ...analyzed, visionData });
   } catch (err) {
     console.error('Analyze error:', err);
-    res.json({ searchQueries: [req.body.message || 'product'], reply: 'جاري البحث...', confidence: 60 });
+    res.json({ searchType: 'product', searchQueries: [req.body.message || 'product'],
+      reply: 'جاري البحث...', confidence: 60 });
   }
 });
 
 // ────────────────────────────────────
-// 5A. Rainforest API — Amazon
+// 5A. Amazon — Rainforest API
 // ────────────────────────────────────
 async function searchAmazon(query, market = 'SA') {
   try {
     const API_KEY = process.env.RAINFOREST_API_KEY;
-    if (!API_KEY) { console.log('Rainforest: no key'); return []; }
-    if (!query?.trim()) return [];
+    if (!API_KEY || !query?.trim()) return [];
 
-    // حدد amazon_domain حسب السوق
     const domainMap = {
-      SA: 'amazon.sa', AE: 'amazon.ae', EG: 'amazon.eg',
-      US: 'amazon.com', CA: 'amazon.ca', KW: 'amazon.sa',
-      QA: 'amazon.sa',
+      SA:'amazon.sa', AE:'amazon.ae', EG:'amazon.eg',
+      US:'amazon.com', CA:'amazon.ca', KW:'amazon.sa', QA:'amazon.sa',
     };
     const amazon_domain = domainMap[market] || 'amazon.sa';
+    const url = `https://api.rainforestapi.com/request?api_key=${API_KEY}&type=search&amazon_domain=${amazon_domain}&search_term=${encodeURIComponent(query)}&sort_by=relevance`;
 
-    const url = `https://api.rainforestapi.com/request?api_key=${API_KEY}&type=search&amazon_domain=${amazon_domain}&search_term=${encodeURIComponent(query)}&sort_by=relevance&page=1`;
-
-    console.log(`Amazon search: "${query}" on ${amazon_domain}`);
+    console.log(`Amazon: "${query}" → ${amazon_domain}`);
     const response = await fetch(url);
     const data     = await response.json();
+    if (!data.search_results?.length) return [];
 
-    if (!data.search_results?.length) {
-      console.log('Amazon: no results for', query);
-      return [];
-    }
-
-    // عملة حسب السوق
     const currencyMap = { SA:'ر.س', AE:'د.إ', EG:'ج.م', US:'$', CA:'C$', KW:'ر.س', QA:'ر.س' };
     const currency = currencyMap[market] || 'ر.س';
 
@@ -313,7 +334,7 @@ async function searchAmazon(query, market = 'SA') {
       name:   item.title?.slice(0, 70) || query,
       price:  item.price?.value ? `${item.price.value} ${currency}` : (item.price?.raw || 'تحقق من السعر'),
       store:  `Amazon ${market}`,
-      image:  item.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
+      image:  item.image || '',
       url:    item.link || `https://www.amazon.sa/s?k=${encodeURIComponent(query)}`,
       badge:  i === 0 ? '🏆 Amazon' : '',
       rating: item.rating ? String(item.rating) : null,
@@ -332,61 +353,53 @@ async function searchAliExpress(query, wantCheaper = false) {
   try {
     const APP_KEY    = process.env.ALIEXPRESS_APP_KEY;
     const APP_SECRET = process.env.ALIEXPRESS_APP_SECRET;
-    if (!APP_KEY || !APP_SECRET) { console.log('AliExpress: no keys'); return []; }
-    if (!query?.trim()) return [];
+    if (!APP_KEY || !APP_SECRET || !query?.trim()) return [];
 
-    // AliExpress Affiliate Product Query API
-    const timestamp  = Date.now();
-    const method     = 'aliexpress.affiliate.product.query';
-    const sortBy     = wantCheaper ? 'SALE_PRICE_ASC' : 'SALE_PRICE_DESC';
-
-    // بناء الـ params
     const params = {
-      app_key:       APP_KEY,
-      timestamp:     String(timestamp),
-      sign_method:   'md5',
-      method,
-      keywords:      query,
-      page_size:     '6',
-      page_no:       '1',
-      sort:          sortBy,
+      app_key:         APP_KEY,
+      timestamp:       String(Date.now()),
+      sign_method:     'md5',
+      method:          'aliexpress.affiliate.product.query',
+      keywords:        query,
+      page_size:       '6',
+      page_no:         '1',
+      sort:            wantCheaper ? 'SALE_PRICE_ASC' : 'SALE_PRICE_DESC',
       target_currency: 'USD',
       target_language: 'EN',
-      tracking_id:   APP_KEY,
+      tracking_id:     APP_KEY,
     };
 
-    // توليد الـ signature
-    const sign = generateAliSign(params, APP_SECRET);
-    params.sign = sign;
+    params.sign = generateAliSign(params, APP_SECRET);
 
     const queryString = Object.entries(params)
       .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
       .join('&');
 
-    const url = `https://api-sg.aliexpress.com/sync?${queryString}`;
-    console.log(`AliExpress search: "${query}"`);
-
-    const response = await fetch(url);
+    console.log(`AliExpress: "${query}"`);
+    const response = await fetch(`https://api-sg.aliexpress.com/sync?${queryString}`);
     const data     = await response.json();
 
-    // استخرج النتائج
-    const respKey  = 'aliexpress_affiliate_product_query_response';
-    const items    = data?.[respKey]?.resp_result?.result?.products?.product;
+    const items = data?.['aliexpress_affiliate_product_query_response']
+      ?.resp_result?.result?.products?.product;
 
     if (!items?.length) {
-      console.log('AliExpress: no results for', query, JSON.stringify(data).slice(0, 200));
+      console.log('AliExpress no results:', JSON.stringify(data).slice(0, 150));
       return [];
     }
 
     return items.slice(0, 5).map((item, i) => ({
       id:     `ali-${Date.now()}-${i}`,
       name:   item.product_title?.slice(0, 70) || query,
-      price:  item.target_sale_price ? `${item.target_sale_price} ${item.target_sale_price_currency || 'USD'}` : 'تحقق من السعر',
+      price:  item.target_sale_price
+        ? `${item.target_sale_price} ${item.target_sale_price_currency || 'USD'}`
+        : 'تحقق من السعر',
       store:  'AliExpress',
-      image:  item.product_main_image_url || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop',
+      image:  item.product_main_image_url || '',
       url:    item.promotion_link || item.product_detail_url || '#',
       badge:  i === 0 ? '🛒 AliExpress' : '',
-      rating: item.evaluate_rate ? String(parseFloat(item.evaluate_rate) / 20) : null,
+      rating: item.evaluate_rate
+        ? (parseFloat(item.evaluate_rate) / 20).toFixed(1)
+        : null,
       source: 'aliexpress',
     }));
   } catch (err) {
@@ -395,13 +408,29 @@ async function searchAliExpress(query, wantCheaper = false) {
   }
 }
 
-// توليد MD5 signature لـ AliExpress
 function generateAliSign(params, secret) {
-  const crypto = require('crypto');
-  // رتّب الـ params أبجدياً
   const sorted = Object.keys(params).sort().map(k => `${k}${params[k]}`).join('');
-  const str    = secret + sorted + secret;
-  return crypto.createHash('md5').update(str).digest('hex').toUpperCase();
+  return crypto.createHash('md5').update(secret + sorted + secret).digest('hex').toUpperCase();
+}
+
+// ────────────────────────────────────
+// 5C. Flights — PLACEHOLDER (جاهز للربط)
+// ────────────────────────────────────
+async function searchFlights(flightData) {
+  // TODO: ربط Skyscanner API أو Amadeus
+  // flightData = { from, to, date, passengers }
+  console.log('Flight search requested:', flightData);
+  return []; // placeholder
+}
+
+// ────────────────────────────────────
+// 5D. Hotels — PLACEHOLDER (جاهز للربط)
+// ────────────────────────────────────
+async function searchHotels(hotelData) {
+  // TODO: ربط Booking.com API أو Hotels.com
+  // hotelData = { city, checkIn, checkOut, guests }
+  console.log('Hotel search requested:', hotelData);
+  return []; // placeholder
 }
 
 // ────────────────────────────────────
@@ -409,54 +438,83 @@ function generateAliSign(params, secret) {
 // ────────────────────────────────────
 app.post('/api/search', async (req, res) => {
   try {
-    const { queries, query, market = 'SA', wantCheaper = false } = req.body;
-    const searchTerms = (queries || [query]).filter(q => q && q.trim().length > 0);
+    const {
+      queries, query, market = 'SA',
+      wantCheaper = false,
+      searchType  = 'product',
+      flightData, hotelData,
+    } = req.body;
 
-    if (!searchTerms.length) {
-      return res.json({ products: [], mock: false });
+    const searchTerms = (queries || [query]).filter(q => q?.trim().length > 0);
+    console.log(`=== Search [${searchType}] ===`, searchTerms.slice(0,2));
+
+    // ── تذاكر طيران ──
+    if (searchType === 'flight') {
+      const results = await searchFlights(flightData || {});
+      if (results.length) return res.json({ products: results, mock: false, searchType: 'flight' });
+      // Fallback مؤقت لو ما في API
+      return res.json({
+        products: [],
+        mock: false,
+        searchType: 'flight',
+        message: 'سيتم إضافة البحث عن الرحلات قريباً ✈️',
+      });
     }
 
-    console.log('=== Search start ===', searchTerms.slice(0, 3));
+    // ── فنادق ──
+    if (searchType === 'hotel') {
+      const results = await searchHotels(hotelData || {});
+      if (results.length) return res.json({ products: results, mock: false, searchType: 'hotel' });
+      return res.json({
+        products: [],
+        mock: false,
+        searchType: 'hotel',
+        message: 'سيتم إضافة البحث عن الفنادق قريباً 🏨',
+      });
+    }
 
-    // ابحث بأفضل 3 queries بالتوازي في كلا المتجرين
-    const topQueries = searchTerms.slice(0, 3);
+    // ── منتجات: Amazon + AliExpress بالتوازي ──
+    if (!searchTerms.length) return res.json({ products: [], mock: false });
+
+    const topQ = searchTerms.slice(0, 3);
 
     const [amazonResults, aliResults] = await Promise.all([
-      // Amazon — أفضل query فقط (لتوفير credits)
-      searchAmazon(topQueries[0], market),
-      // AliExpress — نجرب أول قيرتين
+      searchAmazon(topQ[0], market),
       (async () => {
-        let results = await searchAliExpress(topQueries[0], wantCheaper);
-        if (results.length < 3 && topQueries[1]) {
-          const r2 = await searchAliExpress(topQueries[1], wantCheaper);
-          results  = [...results, ...r2];
+        let r = await searchAliExpress(topQ[0], wantCheaper);
+        if (r.length < 3 && topQ[1]) {
+          const r2 = await searchAliExpress(topQ[1], wantCheaper);
+          r = [...r, ...r2];
         }
-        return results;
+        return r;
       })(),
     ]);
 
-    console.log(`Amazon: ${amazonResults.length} | AliExpress: ${aliResults.length}`);
+    console.log(`Results → Amazon: ${amazonResults.length} | AliExpress: ${aliResults.length}`);
 
-    // دمج النتائج: Amazon أولاً ثم AliExpress
+    // دمج: Amazon أولاً ثم AliExpress
     let allProducts = [...amazonResults, ...aliResults];
 
-    // لو ما في نتائج، جرب query ثانية على Amazon
-    if (allProducts.length === 0 && topQueries[1]) {
-      const r2 = await searchAmazon(topQueries[1], market);
+    // لو ما رجع شيء، جرب query ثانية على Amazon
+    if (allProducts.length === 0 && topQ[1]) {
+      const r2 = await searchAmazon(topQ[1], market);
       allProducts = [...r2];
     }
 
-    if (allProducts.length === 0) {
-      console.log('No results from any source');
-      return res.json({ products: [], mock: false });
+    // لو ما زال فارغ، جرب query ثالثة
+    if (allProducts.length === 0 && topQ[2]) {
+      const [r3a, r3b] = await Promise.all([
+        searchAmazon(topQ[2], market),
+        searchAliExpress(topQ[2], wantCheaper),
+      ]);
+      allProducts = [...r3a, ...r3b];
     }
 
-    // ترتيب لو يريد أرخص
     if (wantCheaper) {
       allProducts.sort((a, b) => extractPrice(a.price) - extractPrice(b.price));
     }
 
-    res.json({ products: allProducts.slice(0, 8), mock: false });
+    res.json({ products: allProducts.slice(0, 8), mock: false, searchType: 'product' });
 
   } catch (err) {
     console.error('Search error:', err);
@@ -488,12 +546,12 @@ app.post('/api/filter', async (req, res) => {
 Type: ${originalAnalysis.productType}
 Brand: ${originalAnalysis.brand || 'any'}
 Color: ${originalAnalysis.color || 'any'}
-${wantCheaper ? 'Preference: cheapest similar' : ''}
+${wantCheaper ? 'Preference: cheapest' : ''}
 
 Products (${products.length}):
 ${products.map((p, i) => `${i}: ${p.name} | ${p.price} | ${p.store}`).join('\n')}
 
-Return the best ${Math.min(products.length, 6)} indices ranked by ${wantCheaper ? 'lowest price' : 'relevance'}.
+Return best ${Math.min(products.length, 6)} ranked by ${wantCheaper ? 'price asc' : 'relevance'}.
 JSON only: { "rankedIndices": [0,1,2,3,4,5] }`,
         }],
       }),
@@ -528,8 +586,10 @@ function extractPrice(priceStr) {
 // ────────────────────────────────────
 app.listen(config.PORT, () => {
   console.log(`✅ fetchli.shop running on port ${config.PORT}`);
-  console.log(`   Amazon (Rainforest): ${process.env.RAINFOREST_API_KEY ? '✅' : '❌'}`);
-  console.log(`   AliExpress:          ${process.env.ALIEXPRESS_APP_KEY ? '✅' : '❌'}`);
-  console.log(`   Google Vision:       ${process.env.GOOGLE_VISION_KEY  ? '✅' : '❌'}`);
-  console.log(`   Claude:              ${process.env.CLAUDE_API_KEY     ? '✅' : '❌'}`);
+  console.log(`   Amazon  (Rainforest): ${process.env.RAINFOREST_API_KEY ? '✅' : '❌'}`);
+  console.log(`   AliExpress:           ${process.env.ALIEXPRESS_APP_KEY ? '✅' : '❌'}`);
+  console.log(`   Google Vision:        ${process.env.GOOGLE_VISION_KEY  ? '✅' : '❌'}`);
+  console.log(`   Claude:               ${process.env.CLAUDE_API_KEY     ? '✅' : '❌'}`);
+  console.log(`   Flights API:          ⏳ placeholder`);
+  console.log(`   Hotels API:           ⏳ placeholder`);
 });

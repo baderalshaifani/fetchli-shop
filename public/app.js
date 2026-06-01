@@ -19,12 +19,11 @@ async function detectLocation() {
 }
 
 // ────────────────────────────────────
-// إرسال رسالة نصية
+// إرسال رسالة
 // ────────────────────────────────────
 async function sendMessage(text, imageBase64 = null) {
   if (!text && !imageBase64) return;
 
-  // هل يريد أرخص؟
   const wantCheaper = text && /أرخص|رخيص|بديل|أوفر|اقتصادي|cheaper|budget|alternative/i.test(text);
 
   addMessage('user', imageBase64 ? `📸 ${text || 'صورة منتج'}` : text);
@@ -32,60 +31,80 @@ async function sendMessage(text, imageBase64 = null) {
   showTyping('جاري تحليل طلبك...');
 
   try {
-    // ── المرحلة ١: تحليل عميق بـ Claude ──
+    // ── المرحلة ١: تحليل Claude ──
     const analyzeRes = await fetch(`${API}/api/analyze`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ message: text, imageBase64, wantCheaper }),
     });
     const analyzed = await analyzeRes.json();
+    const searchType = analyzed.searchType || 'product';
 
-    updateTyping('جاري البحث في المتاجر...');
+    // رسالة البحث حسب النوع
+    const searchingMsg = {
+      product: 'جاري البحث في المتاجر...',
+      hotel:   'جاري البحث عن الفنادق...',
+      flight:  'جاري البحث عن الرحلات...',
+      other:   'جاري البحث...',
+    }[searchType] || 'جاري البحث...';
 
-    // ── المرحلة ٢: بحث متعدد بـ 5 كلمات ──
+    updateTyping(searchingMsg);
+
+    // ── المرحلة ٢: البحث ──
     const searchRes = await fetch(`${API}/api/search`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({
-        queries:     analyzed.searchQueries || [text],
-        market:      userLocation.market || 'SA',
+        queries:    analyzed.searchQueries || [text],
+        market:     userLocation.market || 'SA',
         wantCheaper,
+        searchType,
+        flightData: analyzed.flightData || null,
+        hotelData:  analyzed.hotelData  || null,
       }),
     });
-    const { products, mock } = await searchRes.json();
+    const searchData = await searchRes.json();
+    const { products, message: serverMsg } = searchData;
 
-    // ── المرحلة ٣: تصفية بـ Claude للدقة العالية ──
-    let finalProducts = products;
-    if (products?.length > 0 && analyzed.productType) {
+    // ── المرحلة ٣: تصفية (للمنتجات فقط) ──
+    let finalProducts = products || [];
+    if (searchType === 'product' && finalProducts.length > 0 && analyzed.productType) {
       updateTyping('جاري اختيار الأفضل لك...');
       try {
         const filterRes = await fetch(`${API}/api/filter`, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ products, originalAnalysis: analyzed, wantCheaper }),
+          body:    JSON.stringify({ products: finalProducts, originalAnalysis: analyzed, wantCheaper }),
         });
         const filtered = await filterRes.json();
-        // استخدم النتائج المصفّاة فقط لو فيها منتجات، وإلا ابقى على الأصل
         if (filtered.products?.length >= 1) finalProducts = filtered.products;
-      } catch (e) {
-        console.warn('Filter failed, using original products');
-      }
+      } catch (e) {}
     }
 
     removeTyping();
 
-    // ── عرض النتائج ──
-    const confidence = analyzed.confidence || 90;
-    const reply = analyzed.reply || `وجدت لك ${finalProducts.length} منتجات مطابقة`;
+    // ── عرض الرد ──
+    const reply = analyzed.reply || '';
     const detailLine = analyzed.productType
       ? `\n🔍 ${analyzed.productType}${analyzed.brand ? ` • ${analyzed.brand}` : ''}${analyzed.color ? ` • ${analyzed.color}` : ''}`
       : '';
-    const mockNote = mock ? '\n\n_نتائج تجريبية — سيتم ربط Amazon قريباً_' : '';
-    const accuracyNote = `\n✦ دقة التطابق: ${confidence}٪`;
+    const confidenceLine = analyzed.confidence ? `\n✦ دقة التحليل: ${analyzed.confidence}٪` : '';
 
-    addMessage('ai', reply + detailLine + accuracyNote + mockNote);
+    // رسائل خاصة للرحلات والفنادق لو ما في API بعد
+    if ((searchType === 'flight' || searchType === 'hotel') && finalProducts.length === 0) {
+      const icon = searchType === 'flight' ? '✈️' : '🏨';
+      const typeAr = searchType === 'flight' ? 'الرحلات' : 'الفنادق';
+      addMessage('ai', `${reply || `فهمت طلبك!`}${detailLine}\n\n${icon} خاصية البحث عن ${typeAr} قادمة قريباً — سنضيفها في التحديث القادم!`);
+      return;
+    }
 
-    if (finalProducts?.length > 0) addProducts(finalProducts, wantCheaper);
+    addMessage('ai', reply + detailLine + confidenceLine);
+
+    if (finalProducts.length > 0) {
+      addProducts(finalProducts, wantCheaper);
+    } else {
+      addMessage('ai', '⚠️ لم أجد نتائج مطابقة، جرب وصفاً أكثر تفصيلاً أو صورة للمنتج.');
+    }
 
   } catch (err) {
     removeTyping();
@@ -99,8 +118,6 @@ async function sendMessage(text, imageBase64 = null) {
 // ────────────────────────────────────
 function handleImageUpload(file) {
   if (!file) return;
-
-  // عرض preview
   const reader = new FileReader();
   reader.onload = (e) => {
     const base64 = e.target.result.split(',')[1];
@@ -137,49 +154,67 @@ function addImagePreview(src) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+// تخزين المنتجات بأمان
+window._fetchliProducts = [];
+
 function addProducts(products, cheaper = false) {
   const chat = document.getElementById('chatArea');
+
   if (cheaper) {
     const label = document.createElement('div');
     label.className = 'cheaper-label';
     label.textContent = '💰 مرتبة من الأرخص للأغلى';
     chat.appendChild(label);
   }
+
+  // فصل Amazon و AliExpress
+  const amazonItems = products.filter(p => p.source === 'amazon');
+  const aliItems    = products.filter(p => p.source === 'aliexpress');
+  const otherItems  = products.filter(p => p.source !== 'amazon' && p.source !== 'aliexpress');
+  const allOrdered  = [...amazonItems, ...aliItems, ...otherItems];
+
+  const startIdx = window._fetchliProducts.length;
+  window._fetchliProducts.push(...allOrdered);
+
   const grid = document.createElement('div');
   grid.className = 'products-grid';
-  grid.innerHTML = products.map(p => `
+  grid.innerHTML = allOrdered.map((p, i) => {
+    const idx = startIdx + i;
+    const storeIcon = p.source === 'amazon' ? '🏪' : p.source === 'aliexpress' ? '🛒' : '🏬';
+    return `
     <div class="product-card">
       <div class="product-img-wrap">
-        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
-        <span class="product-badge">${p.badge || ''}</span>
+        <img src="${p.image || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'}"
+             alt="${p.name}" class="product-img" loading="lazy"
+             onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'">
+        ${p.badge ? `<span class="product-badge">${p.badge}</span>` : ''}
       </div>
       <div class="product-body">
         <div class="product-name">${p.name}</div>
         <div class="product-store">
-          <span class="dot"></span>${p.store}
+          ${storeIcon} ${p.store}
           ${p.rating ? `<span class="rating">⭐ ${p.rating}</span>` : ''}
         </div>
         <div class="product-price">${p.price}</div>
         <div class="product-actions">
-          <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
-            التفاصيل
-          </button>
-          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">
-            اشتري ←
-          </a>
+          <button class="btn-details" onclick="openProduct(${idx})">التفاصيل</button>
+          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">اشتري ←</a>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+
   chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
 }
 
-function openProduct(p) {
+function openProduct(idx) {
+  const p = window._fetchliProducts[idx];
+  if (!p) return;
   document.getElementById('ms-name').textContent  = p.name;
   document.getElementById('ms-store').textContent = p.store;
   document.getElementById('ms-price').textContent = p.price;
-  document.getElementById('ms-img').src           = p.image;
+  document.getElementById('ms-img').src           = p.image || '';
   document.getElementById('ms-link').href         = p.url;
   document.getElementById('ministore').style.display = 'flex';
 }
