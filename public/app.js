@@ -3,42 +3,6 @@
 // ===================================
 
 const API = '';
-
-// ── CSS للـ store sections — يُحقن مرة واحدة ──
-(function injectStoreCSS() {
-  const style = document.createElement('style');
-  style.textContent = `
-    .stores-wrapper { display: flex; flex-direction: column; gap: 20px; width: 100%; }
-
-    .store-section { width: 100%; }
-
-    .store-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      margin-bottom: 10px;
-      background: rgba(255,255,255,0.04);
-      border-radius: 10px;
-      border-right: 3px solid rgba(255,255,255,0.15);
-    }
-    .store-header-icon { font-size: 18px; }
-    .store-header-name {
-      font-weight: 700;
-      font-size: 14px;
-      flex: 1;
-      color: #fff;
-    }
-    .store-header-count {
-      font-size: 11px;
-      color: rgba(255,255,255,0.4);
-      background: rgba(255,255,255,0.08);
-      padding: 2px 8px;
-      border-radius: 20px;
-    }
-  `;
-  document.head.appendChild(style);
-})();
 let userLocation = { country: 'SA', market: 'SA', currency: 'SAR', flag: '🇸🇦', name: 'السعودية' };
 
 // ────────────────────────────────────
@@ -76,13 +40,6 @@ async function sendMessage(text, imageBase64 = null) {
     });
     const analyzed = await analyzeRes.json();
 
-    // ── لو الصورة غير واضحة — اطلب توضيح ──
-    if (analyzed.needsClarification) {
-      removeTyping();
-      addMessage('ai', analyzed.reply);
-      return;
-    }
-
     updateTyping('جاري البحث في المتاجر...');
 
     // ── المرحلة ٢: بحث متعدد بـ 5 كلمات ──
@@ -93,15 +50,13 @@ async function sendMessage(text, imageBase64 = null) {
         queries:     analyzed.searchQueries || [text],
         market:      userLocation.market || 'SA',
         wantCheaper,
-        imageBase64, // ★ للـ Google Lens + Claude Visual Filter
-        analysis:    analyzed, // ★ للـ title filter + visual filter
       }),
     });
     const { products, mock } = await searchRes.json();
 
     // ── المرحلة ٣: تصفية بـ Claude للدقة العالية ──
     let finalProducts = products;
-    if (products?.length > 3 && analyzed.productType) {
+    if (products?.length > 0 && analyzed.productType) {
       updateTyping('جاري اختيار الأفضل لك...');
       try {
         const filterRes = await fetch(`${API}/api/filter`, {
@@ -110,22 +65,14 @@ async function sendMessage(text, imageBase64 = null) {
           body:    JSON.stringify({ products, originalAnalysis: analyzed, wantCheaper }),
         });
         const filtered = await filterRes.json();
-        if (filtered.products?.length) finalProducts = filtered.products;
-      } catch (e) {}
+        // استخدم النتائج المصفّاة فقط لو فيها منتجات، وإلا ابقى على الأصل
+        if (filtered.products?.length >= 1) finalProducts = filtered.products;
+      } catch (e) {
+        console.warn('Filter failed, using original products');
+      }
     }
 
     removeTyping();
-
-    // ── لو ما في نتائج — رسالة واضحة بدون mock ──
-    if (!finalProducts?.length) {
-      addMessage('ai', `لم أجد منتجات مطابقة حالياً 😔
-
-جرّب:
-• وصف المنتج بكلمات أبسط
-• إرسال صورة المنتج مباشرة بدون خلفية
-• البحث بالاسم مباشرة`);
-      return;
-    }
 
     // ── عرض النتائج ──
     const confidence = analyzed.confidence || 90;
@@ -133,9 +80,10 @@ async function sendMessage(text, imageBase64 = null) {
     const detailLine = analyzed.productType
       ? `\n🔍 ${analyzed.productType}${analyzed.brand ? ` • ${analyzed.brand}` : ''}${analyzed.color ? ` • ${analyzed.color}` : ''}`
       : '';
+    const mockNote = mock ? '\n\n_نتائج تجريبية — سيتم ربط Amazon قريباً_' : '';
     const accuracyNote = `\n✦ دقة التطابق: ${confidence}٪`;
 
-    addMessage('ai', reply + detailLine + accuracyNote);
+    addMessage('ai', reply + detailLine + accuracyNote + mockNote);
 
     if (finalProducts?.length > 0) addProducts(finalProducts, wantCheaper);
 
@@ -189,34 +137,20 @@ function addImagePreview(src) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-// خريطة أيقونات المتاجر
-const STORE_ICONS = {
-  amazon:     '📦',
-  aliexpress: '🛒',
-  rainforest: '📦',
-  noon:       '🌞',
-  jarir:      '📚',
-  extra:      '🔌',
-  namshi:     '👗',
-  default:    '🏪',
-};
-
-function getStoreIcon(source) {
-  if (!source) return STORE_ICONS.default;
-  const s = source.toLowerCase();
-  for (const [key, icon] of Object.entries(STORE_ICONS)) {
-    if (s.includes(key)) return icon;
+function addProducts(products, cheaper = false) {
+  const chat = document.getElementById('chatArea');
+  if (cheaper) {
+    const label = document.createElement('div');
+    label.className = 'cheaper-label';
+    label.textContent = '💰 مرتبة من الأرخص للأغلى';
+    chat.appendChild(label);
   }
-  return STORE_ICONS.default;
-}
-
-function productCardHTML(p) {
-  const safeP = JSON.stringify(p).replace(/"/g, '&quot;');
-  return `
+  const grid = document.createElement('div');
+  grid.className = 'products-grid';
+  grid.innerHTML = products.map(p => `
     <div class="product-card">
       <div class="product-img-wrap">
-        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy"
-          onerror="this.src='https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop'">
+        <img src="${p.image}" alt="${p.name}" class="product-img" loading="lazy">
         <span class="product-badge">${p.badge || ''}</span>
       </div>
       <div class="product-body">
@@ -227,64 +161,17 @@ function productCardHTML(p) {
         </div>
         <div class="product-price">${p.price}</div>
         <div class="product-actions">
-          <button class="btn-details" onclick='openProduct(${safeP})'>التفاصيل</button>
-          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">اشتري ←</a>
+          <button class="btn-details" onclick='openProduct(${JSON.stringify(p).replace(/"/g, "&quot;")})'>
+            التفاصيل
+          </button>
+          <a class="btn-buy" href="${p.url}" target="_blank" rel="noopener">
+            اشتري ←
+          </a>
         </div>
       </div>
-    </div>`;
-}
-
-function addProducts(products, cheaper = false) {
-  const chat = document.getElementById('chatArea');
-
-  if (cheaper) {
-    const label = document.createElement('div');
-    label.className = 'cheaper-label';
-    label.textContent = '💰 مرتبة من الأرخص للأغلى';
-    chat.appendChild(label);
-  }
-
-  // ── تجميع المنتجات حسب المتجر ──
-  const grouped = {};
-  products.forEach(p => {
-    const key = p.source || p.store || 'other';
-    if (!grouped[key]) grouped[key] = { label: p.store, source: p.source, items: [] };
-    grouped[key].items.push(p);
-  });
-
-  const sections = Object.values(grouped);
-
-  // لو متجر واحد فقط — اعرض بدون header
-  if (sections.length === 1) {
-    const grid = document.createElement('div');
-    grid.className = 'products-grid';
-    grid.innerHTML = sections[0].items.map(productCardHTML).join('');
-    chat.appendChild(grid);
-    chat.scrollTop = chat.scrollHeight;
-    return;
-  }
-
-  // لو أكثر من متجر — اعرض كل متجر في section منفصلة
-  const wrapper = document.createElement('div');
-  wrapper.className = 'stores-wrapper';
-
-  sections.forEach(section => {
-    const icon = getStoreIcon(section.source);
-    const storeSection = document.createElement('div');
-    storeSection.className = 'store-section';
-    storeSection.innerHTML = `
-      <div class="store-header">
-        <span class="store-header-icon">${icon}</span>
-        <span class="store-header-name">${section.label}</span>
-        <span class="store-header-count">${section.items.length} منتج</span>
-      </div>
-      <div class="products-grid">
-        ${section.items.map(productCardHTML).join('')}
-      </div>`;
-    wrapper.appendChild(storeSection);
-  });
-
-  chat.appendChild(wrapper);
+    </div>
+  `).join('');
+  chat.appendChild(grid);
   chat.scrollTop = chat.scrollHeight;
 }
 
