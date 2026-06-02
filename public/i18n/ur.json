@@ -1,0 +1,51 @@
+{
+  "dir": "rtl",
+  "lang": "ur",
+  "appName": "fetchli",
+  "shopSubtitle": "ذہین خریداری معاون",
+  "travelSubtitle": "ذہین سفر معاون",
+  "tabShop": "🛍️ خریداری",
+  "tabTravel": "✈️ سفر",
+  "welcomeShop": "ہیلو! میں fetchli ہوں 🛍️\nمجھے کوئی پروڈکٹ کا نام یا تصویر بھیجیں اور میں فوری طور پر بہترین اسٹورز میں تلاش کروں گا۔",
+  "welcomeTravel": "ہیلو! میں fetchli ہوں ✈️\nاپنی منزل بتائیں یا ٹکٹ کی تصویر بھیجیں اور میں بہترین آپشنز تلاش کروں گا۔",
+  "placeholderShop": "پروڈکٹ کا نام لکھیں یا تصویر اپ لوڈ کریں...",
+  "placeholderTravel": "فلائٹ یا ہوٹل تلاش کریں یا ٹکٹ کی تصویر اپ لوڈ کریں...",
+  "analyzing": "آپ کی درخواست کا تجزیہ ہو رہا ہے...",
+  "searchingShops": "اسٹورز میں تلاش جاری ہے...",
+  "searchingFlights": "فلائٹس تلاش ہو رہی ہیں...",
+  "searchingHotels": "ہوٹلز تلاش ہو رہے ہیں...",
+  "filtering": "آپ کے لیے بہترین انتخاب ہو رہا ہے...",
+  "noResults": "⚠️ کوئی مماثل نتیجہ نہیں ملا۔ مزید تفصیل یا تصویر بھیجیں۔",
+  "comingSoonFlights": "فلائٹ سرچ جلد آ رہا ہے ✈️",
+  "comingSoonHotels": "ہوٹل سرچ جلد آ رہا ہے 🏨",
+  "buyNow": "ابھی خریدیں ←",
+  "details": "تفصیلات",
+  "trusted": "✓ قابل اعتماد",
+  "verified": "✓ تصدیق شدہ",
+  "store": "اسٹور",
+  "cheapestFirst": "💰 سب سے سستے سے مہنگے",
+  "errorMsg": "غلطی ہوئی، دوبارہ کوشش کریں 🙏",
+  "imageProduct": "پروڈکٹ کی تصویر",
+  "features": {
+    "delivery": "🚚 تیز ڈیلیوری",
+    "returns": "↩️ مفت واپسی",
+    "secure": "🔒 محفوظ ادائیگی",
+    "original": "✅ اصل پروڈکٹ"
+  },
+  "chipsShop": [
+    { "label": "👜 چینل بیگ", "query": "Chanel bag" },
+    { "label": "📱 iPhone 15", "query": "iPhone 15" },
+    { "label": "🌸 عطر", "query": "women perfume" },
+    { "label": "⌚ رولیکس گھڑی", "query": "Rolex watch" },
+    { "label": "💆 بال گرنا", "query": "hair loss shampoo treatment" },
+    { "label": "✨ وائٹننگ کریم", "query": "skin whitening cream" },
+    { "label": "👟 نائکی جوتے", "query": "Nike shoes" }
+  ],
+  "chipsTravel": [
+    { "label": "🏨 دبئی ہوٹل", "query": "hotel in Dubai 2 nights" },
+    { "label": "✈️ ریاض ← قاہرہ", "query": "flight from Riyadh to Cairo" },
+    { "label": "🕌 استنبول ہوٹل", "query": "hotel in Istanbul" },
+    { "label": "🇬🇧 لندن فلائٹ", "query": "flight to London" },
+    { "label": "🌴 بینکاک ہوٹل", "query": "hotel in Bangkok" }
+  ]
+}

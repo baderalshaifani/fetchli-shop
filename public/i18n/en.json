@@ -1,0 +1,51 @@
+{
+  "dir": "ltr",
+  "lang": "en",
+  "appName": "fetchli",
+  "shopSubtitle": "Smart Shopping Assistant",
+  "travelSubtitle": "Smart Travel Assistant",
+  "tabShop": "🛍️ Shop",
+  "tabTravel": "✈️ Travel",
+  "welcomeShop": "Hi! I'm fetchli 🛍️\nSend me a product name or photo and I'll search the best stores instantly.",
+  "welcomeTravel": "Hi! I'm fetchli ✈️\nTell me your destination or send a ticket photo and I'll find the best options.",
+  "placeholderShop": "Type a product name or upload a photo...",
+  "placeholderTravel": "Search for a flight, hotel, or upload a ticket photo...",
+  "analyzing": "Analyzing your request...",
+  "searchingShops": "Searching stores...",
+  "searchingFlights": "Searching flights...",
+  "searchingHotels": "Searching hotels...",
+  "filtering": "Picking the best for you...",
+  "noResults": "⚠️ No matching results found. Try a more detailed description or upload a photo.",
+  "comingSoonFlights": "Flight search coming soon ✈️",
+  "comingSoonHotels": "Hotel search coming soon 🏨",
+  "buyNow": "Buy Now →",
+  "details": "Details",
+  "trusted": "✓ Trusted",
+  "verified": "✓ Verified",
+  "store": "Store",
+  "cheapestFirst": "💰 Sorted cheapest first",
+  "errorMsg": "An error occurred, please try again 🙏",
+  "imageProduct": "Product image",
+  "features": {
+    "delivery": "🚚 Fast delivery",
+    "returns": "↩️ Free returns",
+    "secure": "🔒 Secure payment",
+    "original": "✅ Authentic product"
+  },
+  "chipsShop": [
+    { "label": "👜 Chanel Bag", "query": "Chanel bag" },
+    { "label": "📱 iPhone 15", "query": "iPhone 15" },
+    { "label": "🌸 Perfume", "query": "women perfume" },
+    { "label": "⌚ Rolex Watch", "query": "Rolex watch" },
+    { "label": "💆 Hair Loss", "query": "hair loss shampoo treatment" },
+    { "label": "✨ Whitening Cream", "query": "skin whitening cream" },
+    { "label": "👟 Nike Shoes", "query": "Nike shoes" }
+  ],
+  "chipsTravel": [
+    { "label": "🏨 Dubai Hotel", "query": "hotel in Dubai 2 nights" },
+    { "label": "✈️ Riyadh → Cairo", "query": "flight from Riyadh to Cairo" },
+    { "label": "🕌 Istanbul Hotel", "query": "hotel in Istanbul" },
+    { "label": "🇬🇧 London Flight", "query": "flight to London" },
+    { "label": "🌴 Bangkok Hotel", "query": "hotel in Bangkok" }
+  ]
+}

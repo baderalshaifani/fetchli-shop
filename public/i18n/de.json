@@ -1,0 +1,51 @@
+{
+  "dir": "ltr",
+  "lang": "de",
+  "appName": "fetchli",
+  "shopSubtitle": "Intelligenter Einkaufsassistent",
+  "travelSubtitle": "Intelligenter Reiseassistent",
+  "tabShop": "🛍️ Einkaufen",
+  "tabTravel": "✈️ Reisen",
+  "welcomeShop": "Hallo! Ich bin fetchli 🛍️\nSenden Sie mir einen Produktnamen oder ein Foto und ich durchsuche die besten Shops sofort.",
+  "welcomeTravel": "Hallo! Ich bin fetchli ✈️\nNennen Sie mir Ihr Reiseziel oder senden Sie ein Ticket-Foto und ich finde die besten Optionen.",
+  "placeholderShop": "Produktname eingeben oder Foto hochladen...",
+  "placeholderTravel": "Flug, Hotel suchen oder Ticket-Foto hochladen...",
+  "analyzing": "Anfrage wird analysiert...",
+  "searchingShops": "Shops werden durchsucht...",
+  "searchingFlights": "Flüge werden gesucht...",
+  "searchingHotels": "Hotels werden gesucht...",
+  "filtering": "Bestes Ergebnis wird ausgewählt...",
+  "noResults": "⚠️ Keine passenden Ergebnisse. Versuchen Sie eine detailliertere Beschreibung oder laden Sie ein Foto hoch.",
+  "comingSoonFlights": "Flugsuche kommt bald ✈️",
+  "comingSoonHotels": "Hotelsuche kommt bald 🏨",
+  "buyNow": "Jetzt kaufen →",
+  "details": "Details",
+  "trusted": "✓ Vertrauenswürdig",
+  "verified": "✓ Verifiziert",
+  "store": "Geschäft",
+  "cheapestFirst": "💰 Günstigstes zuerst",
+  "errorMsg": "Ein Fehler ist aufgetreten, bitte versuchen Sie es erneut 🙏",
+  "imageProduct": "Produktbild",
+  "features": {
+    "delivery": "🚚 Schnelle Lieferung",
+    "returns": "↩️ Kostenlose Rücksendung",
+    "secure": "🔒 Sichere Zahlung",
+    "original": "✅ Originalprodukt"
+  },
+  "chipsShop": [
+    { "label": "👜 Chanel Tasche", "query": "Chanel bag" },
+    { "label": "📱 iPhone 15", "query": "iPhone 15" },
+    { "label": "🌸 Parfüm", "query": "women perfume" },
+    { "label": "⌚ Rolex Uhr", "query": "Rolex watch" },
+    { "label": "💆 Haarausfall", "query": "hair loss shampoo" },
+    { "label": "✨ Aufhellungscreme", "query": "skin whitening cream" },
+    { "label": "👟 Nike Schuhe", "query": "Nike shoes" }
+  ],
+  "chipsTravel": [
+    { "label": "🏨 Hotel Dubai", "query": "hotel in Dubai 2 nights" },
+    { "label": "✈️ Riad → Kairo", "query": "flight from Riyadh to Cairo" },
+    { "label": "🕌 Hotel Istanbul", "query": "hotel in Istanbul" },
+    { "label": "🇬🇧 Flug London", "query": "flight to London" },
+    { "label": "🌴 Hotel Bangkok", "query": "hotel in Bangkok" }
+  ]
+}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>fetchli — مساعدك الذكي للتسوق والسفر</title>
+  <title>fetchli</title>
 
   <!-- Travelpayouts Drive -->
   <script nowprocket data-noptimize="1" data-cfasync="false" data-wpfc-render="false" seraph-accel-crit="1" data-no-defer="1">
@@ -15,119 +15,69 @@
     })();
   </script>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-
-  <!-- ملف الأنماط المستقل -->
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
-<!-- ══════════════════════════════
-     Header
-     ══════════════════════════════ -->
+<!-- Header -->
 <header class="header">
-
-  <!-- Logo -->
   <div class="logo">F</div>
   <div>
     <div class="logo-text">fetchli</div>
-    <div class="logo-sub" id="modeSubtitle">مساعد التسوق الذكي</div>
+    <div class="logo-sub" id="modeSubtitle"></div>
   </div>
 
-  <!-- Mode Tabs -->
   <div class="mode-tabs">
-    <button class="mode-tab active" id="tabShop" onclick="switchMode('shop')">
-      🛍️ تسوق
-    </button>
-    <button class="mode-tab" id="tabTravel" onclick="switchMode('travel')">
-      ✈️ سفر
-    </button>
+    <button class="mode-tab active" id="tabShop" onclick="switchMode('shop')"></button>
+    <button class="mode-tab" id="tabTravel" onclick="switchMode('travel')"></button>
   </div>
 
-  <!-- Location -->
   <div class="location-badge">
-    <span id="locationFlag">🇸🇦</span>
-    <span id="locationName">السعودية</span>
+    <span id="locationFlag">🌍</span>
+    <span id="locationName"></span>
     <span>▾</span>
   </div>
-
 </header>
 
-<!-- ══════════════════════════════
-     Chat Area
-     ══════════════════════════════ -->
+<!-- Chat -->
 <div class="chat-area" id="chatArea">
   <div class="msg-row ai">
     <div class="msg-avatar ai">✦</div>
-    <div class="msg-bubble ai" id="welcomeMsg">
-      مرحباً! أنا fetchli 🛍️
-أرسل لي اسم أي منتج أو صورته وسأبحث لك في أفضل المتاجر فوراً.
-    </div>
+    <div class="msg-bubble ai" id="welcomeMsg"></div>
   </div>
 </div>
 
-<!-- ══════════════════════════════
-     Chips
-     ══════════════════════════════ -->
+<!-- Chips -->
 <div class="chips-wrapper">
-
-  <!-- chips التسوق -->
-  <div class="chips chips-shop">
-    <button class="chip" data-query="شنطة شانيل">👜 شنطة شانيل</button>
-    <button class="chip" data-query="iPhone 15">📱 iPhone 15</button>
-    <button class="chip" data-query="عطر نسائي">🌸 عطر نسائي</button>
-    <button class="chip" data-query="ساعة رولكس">⌚ ساعة رولكس</button>
-    <button class="chip" data-query="شامبو تساقط شعر">💆 تساقط الشعر</button>
-    <button class="chip" data-query="كريم مبيض للبشرة">✨ كريم مبيض</button>
-    <button class="chip" data-query="أحذية نايك">👟 نايك</button>
-  </div>
-
-  <!-- chips السفر -->
-  <div class="chips chips-travel">
-    <button class="chip" data-query="فندق في دبي ليلتين">🏨 فندق دبي</button>
-    <button class="chip" data-query="رحلة من الرياض إلى القاهرة">✈️ الرياض ← القاهرة</button>
-    <button class="chip" data-query="فندق في إسطنبول">🕌 فندق إسطنبول</button>
-    <button class="chip" data-query="رحلة إلى لندن">🇬🇧 رحلة لندن</button>
-    <button class="chip" data-query="فندق في بانكوك">🌴 فندق بانكوك</button>
-    <button class="chip" data-query="أفضل فندق في باريس">🗼 فندق باريس</button>
-  </div>
-
+  <div class="chips chips-shop" id="chipsShop"></div>
+  <div class="chips chips-travel" id="chipsTravel" style="display:none"></div>
 </div>
 
-<!-- ══════════════════════════════
-     Input Bar
-     ══════════════════════════════ -->
+<!-- Input -->
 <div class="input-bar">
   <div class="input-inner">
-    <input type="text" id="msgInput" placeholder="اكتب اسم المنتج أو أرسل صورة...">
-    <label for="imageInput" class="btn-img" title="رفع صورة">📷</label>
+    <input type="text" id="msgInput" placeholder="">
+    <label for="imageInput" class="btn-img" title="📷">📷</label>
     <input type="file" id="imageInput" accept="image/*">
     <button id="sendBtn">↩</button>
   </div>
 </div>
 
-<!-- ══════════════════════════════
-     Product Details Modal
-     ══════════════════════════════ -->
+<!-- Product Modal -->
 <div class="ministore-overlay" id="ministore">
   <div class="ministore-panel">
-
     <div class="ms-header">
       <div class="ms-store-name">
         🛍️ <span id="ms-store"></span>
-        <span class="ms-verified">✓ موثوق</span>
+        <span class="ms-verified" id="ms-verified"></span>
       </div>
       <button id="ms-close">✕</button>
     </div>
-
     <div class="ms-body">
       <div class="ms-images">
         <img id="ms-img" src="" alt="">
         <span class="ms-img-badge" id="ms-badge"></span>
       </div>
-
       <div class="ms-details">
         <div class="ms-title" id="ms-name"></div>
         <div class="ms-rating-row">
@@ -140,67 +90,29 @@
         <div class="ms-store-row">
           <span class="ms-store-icon">🏪</span>
           <div class="ms-store-info">
-            <div class="ms-store-label">المتجر</div>
+            <div class="ms-store-label" id="store-label"></div>
             <div class="ms-store-val" id="ms-store-val"></div>
           </div>
-          <span class="ms-store-badge">✓ متحقق</span>
+          <span class="ms-store-badge" id="ms-store-badge"></span>
         </div>
       </div>
     </div>
-
     <div class="ms-features">
-      <div class="ms-feature"><span class="ms-feature-icon">🚚</span> توصيل سريع</div>
-      <div class="ms-feature"><span class="ms-feature-icon">↩️</span> إرجاع مجاني</div>
-      <div class="ms-feature"><span class="ms-feature-icon">🔒</span> دفع آمن</div>
-      <div class="ms-feature"><span class="ms-feature-icon">✅</span> منتج أصلي</div>
+      <div class="ms-feature" id="feat-delivery"></div>
+      <div class="ms-feature" id="feat-returns"></div>
+      <div class="ms-feature" id="feat-secure"></div>
+      <div class="ms-feature" id="feat-original"></div>
     </div>
-
     <div class="ms-footer">
-      <a id="ms-link" href="#" target="_blank" rel="noopener">اشتري الآن ←</a>
+      <a id="ms-link" href="#" target="_blank" rel="noopener"></a>
     </div>
-
   </div>
 </div>
 
+<!-- Modules -->
+<script src="modules/shop.js"></script>
+<script src="modules/travel.js"></script>
 <script src="app.js"></script>
-
-<script>
-// ══════════════════════════════
-// تبديل الوضع: تسوق ↔ سفر
-// ══════════════════════════════
-function switchMode(mode) {
-  const body      = document.body;
-  const tabShop   = document.getElementById('tabShop');
-  const tabTravel = document.getElementById('tabTravel');
-  const subtitle  = document.getElementById('modeSubtitle');
-  const input     = document.getElementById('msgInput');
-  const welcome   = document.getElementById('welcomeMsg');
-
-  if (mode === 'travel') {
-    body.classList.add('travel-mode');
-    tabShop.classList.remove('active');
-    tabTravel.classList.add('active');
-    subtitle.textContent = 'مساعد السفر الذكي';
-    input.placeholder    = 'ابحث عن رحلة أو فندق أو أرسل صورة تذكرة...';
-    welcome.textContent  = 'مرحباً! أنا fetchli ✈️\nاكتب وجهتك أو أرسل صورة تذكرة وسأجد لك أفضل الخيارات.';
-  } else {
-    body.classList.remove('travel-mode');
-    tabShop.classList.add('active');
-    tabTravel.classList.remove('active');
-    subtitle.textContent = 'مساعد التسوق الذكي';
-    input.placeholder    = 'اكتب اسم المنتج أو أرسل صورة...';
-    welcome.textContent  = 'مرحباً! أنا fetchli 🛍️\nأرسل لي اسم أي منتج أو صورته وسأبحث لك في أفضل المتاجر فوراً.';
-  }
-
-  // مسح المحادثة عند التبديل
-  const chat = document.getElementById('chatArea');
-  chat.innerHTML = `
-    <div class="msg-row ai">
-      <div class="msg-avatar ai">✦</div>
-      <div class="msg-bubble ai">${welcome.textContent}</div>
-    </div>`;
-}
-</script>
 
 </body>
 </html>
