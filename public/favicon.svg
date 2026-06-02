@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- خلفية دائرة زرقاء -->
+  <circle cx="50" cy="50" r="50" fill="#1a2a6c"/>
+  <!-- شنطة تسوق ذهبية -->
+  <rect x="28" y="40" width="44" height="36" rx="5" fill="#c9a84c"/>
+  <rect x="28" y="40" width="44" height="10" rx="3" fill="#b8943e"/>
+  <!-- مقبض الشنطة -->
+  <path d="M38 40 Q38 28 50 28 Q62 28 62 40" fill="none" stroke="#c9a84c" stroke-width="5" stroke-linecap="round"/>
+  <!-- طائرة ذهبية -->
+  <g transform="translate(18,48) rotate(-35) scale(0.9)">
+    <ellipse cx="22" cy="10" rx="18" ry="5" fill="#e8d08a"/>
+    <polygon points="22,2 40,10 22,18" fill="#c9a84c"/>
+    <rect x="8" y="8" width="14" height="4" rx="2" fill="#e8d08a"/>
+    <polygon points="4,10 14,6 14,14" fill="#c9a84c"/>
+  </g>
+</svg>

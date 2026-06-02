@@ -3,7 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>fetchli</title>
+  <title>fetchli — مساعدك الذكي للتسوق والسفر</title>
+  <meta name="description" content="fetchli — مساعد ذكي للتسوق والسفر، ابحث عن أي منتج أو رحلة بالصورة أو النص">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="FLOGO.png">
 
   <!-- Travelpayouts Drive -->
   <script nowprocket data-noptimize="1" data-cfasync="false" data-wpfc-render="false" seraph-accel-crit="1" data-no-defer="1">
@@ -19,60 +24,83 @@
 </head>
 <body>
 
-<!-- Header -->
+<!-- ══════════════════════════════
+     Header
+     ══════════════════════════════ -->
 <header class="header">
-  <div class="logo">F</div>
-  <div>
-    <div class="logo-text">fetchli</div>
-    <div class="logo-sub" id="modeSubtitle"></div>
+
+  <!-- الشعار الفخم -->
+  <div class="logo-wrap">
+    <img src="FLOGO.png" alt="fetchli" class="logo-icon-img"
+         style="width:40px;height:40px;border-radius:12px;object-fit:cover;object-position:right center;flex-shrink:0;">
+    <div>
+      <div class="logo-name">fetchli<span class="logo-dot"></span></div>
+      <div class="logo-sub" id="modeSubtitle"></div>
+    </div>
   </div>
 
+  <!-- Mode Tabs -->
   <div class="mode-tabs">
     <button class="mode-tab active" id="tabShop" onclick="switchMode('shop')"></button>
     <button class="mode-tab" id="tabTravel" onclick="switchMode('travel')"></button>
   </div>
 
+  <!-- Location -->
   <div class="location-badge">
     <span id="locationFlag">🌍</span>
     <span id="locationName"></span>
     <span>▾</span>
   </div>
+
 </header>
 
-<!-- Chat -->
+<!-- ══════════════════════════════
+     Chat Area
+     ══════════════════════════════ -->
 <div class="chat-area" id="chatArea">
   <div class="msg-row ai">
-    <div class="msg-avatar ai">✦</div>
+    <div class="msg-avatar ai">
+      <img src="FLOGO.png" alt="fetchli"
+           style="width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:right center;">
+    </div>
     <div class="msg-bubble ai" id="welcomeMsg"></div>
   </div>
 </div>
 
-<!-- Chips -->
+<!-- ══════════════════════════════
+     Chips
+     ══════════════════════════════ -->
 <div class="chips-wrapper">
-  <div class="chips chips-shop" id="chipsShop"></div>
-  <div class="chips chips-travel" id="chipsTravel" style="display:none"></div>
+  <div class="chips-shop" id="chipsShop" style="display:flex;gap:7px;padding:8px 18px;overflow-x:auto;scrollbar-width:none;"></div>
+  <div class="chips-travel" id="chipsTravel" style="display:none;gap:7px;padding:8px 18px;overflow-x:auto;scrollbar-width:none;"></div>
 </div>
 
-<!-- Input -->
+<!-- ══════════════════════════════
+     Input Bar
+     ══════════════════════════════ -->
 <div class="input-bar">
   <div class="input-inner">
     <input type="text" id="msgInput" placeholder="">
-    <label for="imageInput" class="btn-img" title="📷">📷</label>
+    <label for="imageInput" class="btn-img" title="رفع صورة">📷</label>
     <input type="file" id="imageInput" accept="image/*">
     <button id="sendBtn">↩</button>
   </div>
 </div>
 
-<!-- Product Modal -->
+<!-- ══════════════════════════════
+     Product Modal
+     ══════════════════════════════ -->
 <div class="ministore-overlay" id="ministore">
   <div class="ministore-panel">
+
     <div class="ms-header">
       <div class="ms-store-name">
         🛍️ <span id="ms-store"></span>
-        <span class="ms-verified" id="ms-verified"></span>
+        <span class="ms-verified" id="ms-verified">✓ موثوق</span>
       </div>
       <button id="ms-close">✕</button>
     </div>
+
     <div class="ms-body">
       <div class="ms-images">
         <img id="ms-img" src="" alt="">
@@ -90,22 +118,25 @@
         <div class="ms-store-row">
           <span class="ms-store-icon">🏪</span>
           <div class="ms-store-info">
-            <div class="ms-store-label" id="store-label"></div>
+            <div class="ms-store-label" id="store-label">المتجر</div>
             <div class="ms-store-val" id="ms-store-val"></div>
           </div>
-          <span class="ms-store-badge" id="ms-store-badge"></span>
+          <span class="ms-store-badge" id="ms-store-badge">✓ متحقق</span>
         </div>
       </div>
     </div>
+
     <div class="ms-features">
-      <div class="ms-feature" id="feat-delivery"></div>
-      <div class="ms-feature" id="feat-returns"></div>
-      <div class="ms-feature" id="feat-secure"></div>
-      <div class="ms-feature" id="feat-original"></div>
+      <div class="ms-feature" id="feat-delivery">🚚 توصيل سريع</div>
+      <div class="ms-feature" id="feat-returns">↩️ إرجاع مجاني</div>
+      <div class="ms-feature" id="feat-secure">🔒 دفع آمن</div>
+      <div class="ms-feature" id="feat-original">✅ منتج أصلي</div>
     </div>
+
     <div class="ms-footer">
-      <a id="ms-link" href="#" target="_blank" rel="noopener"></a>
+      <a id="ms-link" href="#" target="_blank" rel="noopener">اشتري الآن ←</a>
     </div>
+
   </div>
 </div>
 
