@@ -14,7 +14,7 @@
   --primary:      #2f7dd4;
   --primary2:     #5ba3e8;
   --primary-soft: #e8f3fd;
-  --bg:           #f4f7dd;
+  --bg:           #f0f7ff;
   --bg2:          #ffffff;
   --bg3:          #e4f0fb;
   --border:       rgba(47,125,212,0.15);
@@ -41,7 +41,7 @@ body.travel-mode {
   --primary:      #0d9488;
   --primary2:     #2dd4bf;
   --primary-soft: #d8f8f5;
-  --bg:           #f0e9f7;
+  --bg:           #edfcfb;
   --bg2:          #ffffff;
   --bg3:          #d8f8f5;
   --border:       rgba(13,148,136,0.15);
@@ -75,26 +75,72 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* خلفية ناعمة للتسوق */
+/* ══════════════════════════════════
+   الخلفية — صورة موحدة للوضعين
+   تقنية: صورة مضغوطة + overlay لوني
+   لا تأثير على السرعة (desktop only)
+   ══════════════════════════════════ */
+
+/* موبايل: gradient فقط بدون صورة (أسرع) */
 body::before {
   content: '';
   position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: url('54.png');
-  background-size: cover
-    radial-gradient(ellipse 100% 40% at 50% 0%, rgba(47,125,212,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 30% at 95% 90%, rgba(91,163,232,0.05) 0%, transparent 50%);
+  background:
+    radial-gradient(ellipse 120% 45% at 50% 0%, rgba(47,125,212,0.09) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 35% at 95% 90%, rgba(91,163,232,0.05) 0%, transparent 50%);
   transition: opacity 0.45s;
 }
 
-/* خلفية السفر */
 body.travel-mode::before {
-  background-image: url('55.jpg');
-  background-size: cover
-    radial-gradient(ellipse 100% 40% at 50% 0%, rgba(13,148,136,0.09) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 30% at 95% 90%, rgba(45,212,191,0.05) 0%, transparent 50%);
+  background:
+    radial-gradient(ellipse 120% 45% at 50% 0%, rgba(13,148,136,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 35% at 95% 90%, rgba(45,212,191,0.05) 0%, transparent 50%);
 }
 
-body > * { position: relative; z-index: 1; }
+/* ديسكتوب فقط: الصورة مع overlay */
+@media (min-width: 900px) {
+  body::before {
+    background-image: url('54.png');
+    background-size: cover;
+    background-position: center 30%;
+    background-attachment: fixed;
+    opacity: 0.07;
+  }
+  body.travel-mode::before {
+    background-image: url('54.png');
+    background-size: cover;
+    background-position: center 60%;
+    background-attachment: fixed;
+    opacity: 0.09;
+  }
+}
+
+/* overlay لوني فوق الصورة */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+}
+
+@media (min-width: 900px) {
+  body::after {
+    background: linear-gradient(
+      180deg,
+      rgba(240,247,255,0.88) 0%,
+      rgba(240,247,255,0.75) 40%,
+      rgba(240,247,255,0.88) 100%
+    );
+  }
+  body.travel-mode::after {
+    background: linear-gradient(
+      180deg,
+      rgba(237,252,251,0.88) 0%,
+      rgba(237,252,251,0.75) 40%,
+      rgba(237,252,251,0.88) 100%
+    );
+  }
+}
+
+body > * { position: relative; z-index: 2; }
 
 /* ══════════════════════════════════
    Header — Mobile
