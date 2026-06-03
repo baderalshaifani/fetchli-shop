@@ -4,7 +4,7 @@
 // هذا الملف router فقط — لا يحتوي على أي منطق
 // كل موديول في مجلده المستقل:
 //   modules/shopping/  — كل ما يخص التسوق
-//   modules/travel/    — كل ما يخص السفر (قريباً)
+//   modules/travel/    — كل ما يخص السفر
 //   shared/            — دوال مشتركة
 
 const express  = require('express');
@@ -36,14 +36,14 @@ app.get('/api/location', async (req, res) => {
 // ────────────────────────────────────
 // Modules Routes
 // ────────────────────────────────────
-app.use('/api',         shoppingRouter);   // /api/analyze  /api/search  /api/filter
-app.use('/api/travel',  travelRouter);     // /api/travel/* (قريباً)
+app.use('/api',         shoppingRouter);  // /api/analyze | /api/search | /api/filter
+app.use('/api/travel',  travelRouter);    // /api/travel/analyze | /api/travel/search | /api/travel/suggest
 
 // ────────────────────────────────────
 // تشغيل السيرفر
 // ────────────────────────────────────
 app.listen(config.PORT, () => {
   console.log(`✅ fetchli.shop running on port ${config.PORT}`);
-  console.log(`   Shopping module : /api/analyze | /api/search | /api/filter`);
-  console.log(`   Travel module   : /api/travel/* (coming soon)`);
+  console.log(`   🛍️  Shopping : /api/analyze | /api/search | /api/filter`);
+  console.log(`   ✈️  Travel   : /api/travel/analyze | /api/travel/search | /api/travel/suggest`);
 });
