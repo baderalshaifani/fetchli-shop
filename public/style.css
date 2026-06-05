@@ -42,6 +42,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(10,15,30,0.9
   line-height: 1.1;
   letter-spacing: -2px;
   margin-bottom: 12px;
+  margin-top: 12px;
   animation: fadeUp .5s ease .1s both;
   white-space: nowrap;
 }
