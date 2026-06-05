@@ -1379,6 +1379,11 @@ const API = '';
 let editingSourceId = null;
 let editingCategoryId = null;
 
+// استخرج كلمة المرور من URL تلقائياً
+const _urlToken = new URLSearchParams(window.location.search).get('token') || '';
+if (_urlToken) localStorage.setItem('adminPass', _urlToken);
+const ADMIN_PASS = localStorage.getItem('adminPass') || '';
+
 // Default data (persisted in localStorage until backend is ready)
 const defaultSources = [
   {
@@ -2121,11 +2126,11 @@ async function saveTipsToServer() {
   try {
     const r = await fetch('/api/admin/content', {
       method:'POST',
-      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      headers:{'Content-Type':'application/json','x-admin-password': ADMIN_PASS},
       body: JSON.stringify({ type:'tips', data: tips })
     });
     if(r.ok) toast('✅ تم الحفظ على السيرفر');
-    else toast('❌ خطأ في الحفظ','error');
+    else { r.json().catch(()=>({})).then(e => toast(`❌ خطأ ${r.status}: ${e.error||'فشل'}`,'error')); }
   } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
 }
 
@@ -2223,11 +2228,14 @@ async function saveBlogToServer() {
   try {
     const r = await fetch('/api/admin/content', {
       method:'POST',
-      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      headers:{'Content-Type':'application/json','x-admin-password': ADMIN_PASS},
       body: JSON.stringify({ type:'blog', data: blog })
     });
     if(r.ok) toast('✅ تم الحفظ على السيرفر');
-    else toast('❌ خطأ في الحفظ','error');
+    else {
+      const err = await r.json().catch(()=>({}));
+      toast(`❌ خطأ ${r.status}: ${err.error||'فشل الحفظ'}`, 'error');
+    }
   } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
 }
 
@@ -2310,11 +2318,11 @@ async function saveDealsToServer() {
   try {
     const r = await fetch('/api/admin/content', {
       method:'POST',
-      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      headers:{'Content-Type':'application/json','x-admin-password': ADMIN_PASS},
       body: JSON.stringify({ type:'deals', data: deals })
     });
     if(r.ok) toast('✅ تم الحفظ على السيرفر');
-    else toast('❌ خطأ في الحفظ','error');
+    else { r.json().catch(()=>({})).then(e => toast(`❌ خطأ ${r.status}: ${e.error||'فشل'}`,'error')); }
   } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
 }
 
