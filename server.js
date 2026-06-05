@@ -39,6 +39,9 @@ app.get('/api/location', async (req, res) => {
 app.use('/api',         shoppingRouter);  // /api/analyze | /api/search | /api/filter
 app.use('/api/travel',  travelRouter);    // /api/travel/analyze | /api/travel/search | /api/travel/suggest
 
+
+const contentRouter = require('./modules/content-router');
+app.use('/api/admin', contentRouter);
 // ────────────────────────────────────
 // تشغيل السيرفر
 // ────────────────────────────────────
