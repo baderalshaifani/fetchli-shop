@@ -91,4 +91,18 @@ router.post('/filter', async (req, res) => {
   }
 });
 
+
+const { getShoppingDeals } = require('./deals');
+
+router.get('/deals/shop', async (req, res) => {
+  try {
+    const market = req.query.market || 'SA';
+    const deals  = await getShoppingDeals(market);
+    if (deals?.length) return res.json({ deals, source: 'amazon' });
+    res.json({ deals: [], source: 'fallback' });
+  } catch (err) {
+    res.json({ deals: [], source: 'error' });
+  }
+});
+
 module.exports = router;
