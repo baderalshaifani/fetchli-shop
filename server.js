@@ -589,7 +589,7 @@ app.get('/api/admin/content', (req, res) => {
 // POST — أدمن فقط
 app.post('/api/admin/content', (req, res) => {
   const pass = req.headers['x-admin-password'];
-  if (pass !== (process.env.ADMIN_PASSWORD || 'fetchli2026')) {
+  if (pass !== (process.env.ADMIN_PASSWORD || 'asd121213BN*')) {
     return res.status(401).json({ error: 'غير مصرح' });
   }
   const { type, data } = req.body;
