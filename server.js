@@ -33,6 +33,19 @@ app.get('/api/location', async (req, res) => {
   res.json(location);
 });
 
+
+
+
+//ADMIN
+const ADMIN_TOKEN = process.env.ADMIN_PASSWORD || 'fetchli2026';
+
+app.get('/admin', (req, res) => {
+  const token = req.query.token;
+  if (token !== ADMIN_TOKEN) {
+    return res.status(401).send('غير مصرح');
+  }
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
 // ────────────────────────────────────
 // Modules Routes
 // ────────────────────────────────────
