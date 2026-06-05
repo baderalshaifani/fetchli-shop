@@ -589,7 +589,7 @@ app.get('/api/admin/content', (req, res) => {
 // POST — أدمن فقط
 app.post('/api/admin/content', (req, res) => {
   const pass = req.headers['x-admin-password'];
-  if (pass !== (process.env.ADMIN_PASSWORD || 'asd121213BN*')) {
+  if (pass !== (process.env.ADMIN_PASSWORD || 'fetchli2026')) {
     return res.status(401).json({ error: 'غير مصرح' });
   }
   const { type, data } = req.body;
@@ -604,6 +604,18 @@ app.post('/api/admin/content', (req, res) => {
   writeContent(content)
     ? res.json({ ok:true })
     : res.status(500).json({ error: 'فشل الحفظ — تحقق من Render Disk' });
+});
+
+// ────────────────────────────────────
+// تشغيل السيرفر
+// ────────────────────────────────────
+// ── Admin Panel Route ──
+app.get('/admin', (req, res) => {
+  const token = req.query.token;
+  if (token !== (process.env.ADMIN_PASSWORD || 'fetchli2026')) {
+    return res.status(401).send(`<html><body style="font-family:sans-serif;background:#0a0a0f;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:16px"><div style="font-size:32px">🔒</div><div>غير مصرح</div></body></html>`);
+  }
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
 // ────────────────────────────────────
