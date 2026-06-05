@@ -598,6 +598,28 @@ body {
 }
 
 .scrollbar-hidden::-webkit-scrollbar { display: none; }
+
+/* ── Image Drop Zone ── */
+#article-img-drop:hover,
+#deal-img-drop:hover { border-color: var(--accent); background: rgba(124,106,247,.05); }
+#article-img-drop.drag-over,
+#deal-img-drop.drag-over  { border-color: var(--accent); background: rgba(124,106,247,.1); }
+
+/* ── Article / Deal Card Preview in list ── */
+.content-card-preview {
+  display: flex;
+  align-items: center;
+  gap:10px;
+  padding:10px 12px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:8px;
+}
+.content-card-preview img {
+  width:52px;height:40px;
+  object-fit:cover;border-radius:6px;
+  flex-shrink:0;
+}
 </style>
 </head>
 <body>
@@ -1177,11 +1199,37 @@ body {
 
 <!-- MODAL: Add Article -->
 <div class="modal-overlay" id="modal-addArticle">
-  <div class="modal" style="width:520px">
+  <div class="modal" style="width:640px;max-height:92vh">
     <div class="modal-header">
-      <div class="modal-title" id="article-modal-title">✈️ مقال سفر</div>
+      <div>
+        <div class="modal-title" id="article-modal-title">✈️ مقال سفر</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">أضف مقالاً مع صورة ومحتوى</div>
+      </div>
       <button class="modal-close" onclick="closeModal('addArticle')">×</button>
     </div>
+
+    <!-- صورة الغلاف -->
+    <div style="margin-bottom:20px">
+      <div class="form-label" style="margin-bottom:8px">صورة الغلاف</div>
+      <div id="article-img-drop" onclick="document.getElementById('article-img-input').click()"
+        style="border:2px dashed var(--border);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:.2s;position:relative;background:var(--surface)">
+        <input type="file" id="article-img-input" accept="image/*" style="display:none" onchange="previewArticleImage(this)">
+        <div id="article-img-preview" style="display:none;position:relative">
+          <img id="article-img-preview-el" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;display:block">
+          <button onclick="clearArticleImage(event)" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px">×</button>
+        </div>
+        <div id="article-img-placeholder">
+          <div style="font-size:32px;margin-bottom:8px">🖼️</div>
+          <div style="font-size:13px;color:var(--muted)">اضغط لرفع صورة أو اسحبها هنا</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px">JPG, PNG, WebP — حتى 2MB</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--muted)">أو رابط صورة خارجي:</span>
+        <input class="form-input" id="article-img-url" placeholder="https://..." style="flex:1;font-size:12px;padding:6px 10px" oninput="previewArticleUrl(this.value)">
+      </div>
+    </div>
+
     <div class="form-grid">
       <div class="form-group">
         <label class="form-label">اللغة</label>
@@ -1200,35 +1248,73 @@ body {
       </div>
       <div class="form-group form-full">
         <label class="form-label">عنوان المقال *</label>
-        <input class="form-input" id="article-title" placeholder="عنوان المقال">
+        <input class="form-input" id="article-title" placeholder="مثال: أفضل ١٠ وجهات سياحية في ٢٠٢٦">
       </div>
       <div class="form-group">
         <label class="form-label">الفئة</label>
-        <input class="form-input" id="article-cat" placeholder="مثال: نصائح، وجهات">
+        <input class="form-input" id="article-cat" placeholder="نصائح، وجهات، فنادق...">
       </div>
       <div class="form-group">
         <label class="form-label">وقت القراءة</label>
         <input class="form-input" id="article-read" placeholder="5 دقائق">
       </div>
-      <div class="form-group form-full">
+      <div class="form-group">
         <label class="form-label">أيقونة (emoji)</label>
-        <input class="form-input" id="article-icon" placeholder="📄" style="font-size:20px">
+        <input class="form-input" id="article-icon" placeholder="✈️" style="font-size:20px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">رابط المقال (اختياري)</label>
+        <input class="form-input" id="article-url" placeholder="https://...">
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">مقتطف / وصف قصير</label>
+        <textarea class="form-textarea" id="article-excerpt" placeholder="وصف مختصر يظهر تحت العنوان..." style="min-height:70px"></textarea>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">محتوى المقال</label>
+        <textarea class="form-textarea" id="article-content" placeholder="اكتب محتوى المقال هنا..." style="min-height:120px"></textarea>
       </div>
     </div>
+
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('addArticle')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveArticle()">💾 إضافة</button>
+      <button class="btn btn-primary" onclick="saveArticle()">💾 حفظ المقال</button>
     </div>
   </div>
 </div>
 
 <!-- MODAL: Add Deal -->
 <div class="modal-overlay" id="modal-addDeal">
-  <div class="modal" style="width:520px">
+  <div class="modal" style="width:600px;max-height:92vh">
     <div class="modal-header">
-      <div class="modal-title" id="deal-modal-title">🔥 إضافة عرض</div>
+      <div>
+        <div class="modal-title" id="deal-modal-title">🔥 إضافة عرض</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px">أضف عرضاً يومياً مع صورة</div>
+      </div>
       <button class="modal-close" onclick="closeModal('addDeal')">×</button>
     </div>
+
+    <!-- صورة العرض -->
+    <div style="margin-bottom:20px">
+      <div class="form-label" style="margin-bottom:8px">صورة العرض</div>
+      <div id="deal-img-drop" onclick="document.getElementById('deal-img-input').click()"
+        style="border:2px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:.2s;background:var(--surface)">
+        <input type="file" id="deal-img-input" accept="image/*" style="display:none" onchange="previewDealImage(this)">
+        <div id="deal-img-preview" style="display:none;position:relative">
+          <img id="deal-img-preview-el" style="width:100%;max-height:150px;object-fit:cover;border-radius:8px;display:block">
+          <button onclick="clearDealImage(event)" style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;font-size:14px">×</button>
+        </div>
+        <div id="deal-img-placeholder">
+          <div style="font-size:28px;margin-bottom:6px">🖼️</div>
+          <div style="font-size:13px;color:var(--muted)">اضغط لرفع صورة</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:var(--muted)">أو رابط خارجي:</span>
+        <input class="form-input" id="deal-img-url" placeholder="https://..." style="flex:1;font-size:12px;padding:6px 10px" oninput="previewDealUrl(this.value)">
+      </div>
+    </div>
+
     <div class="form-grid">
       <div class="form-group form-full">
         <label class="form-label">النوع</label>
@@ -1241,9 +1327,13 @@ body {
         <label class="form-label">عنوان العرض *</label>
         <input class="form-input" id="deal-title" placeholder="مثال: تذاكر دبي بخصم 40٪">
       </div>
+      <div class="form-group form-full">
+        <label class="form-label">وصف العرض</label>
+        <textarea class="form-textarea" id="deal-desc" placeholder="تفاصيل إضافية عن العرض..." style="min-height:70px"></textarea>
+      </div>
       <div class="form-group">
         <label class="form-label">الفئة</label>
-        <input class="form-input" id="deal-cat" placeholder="مثال: طيران، فنادق">
+        <input class="form-input" id="deal-cat" placeholder="طيران، فنادق، تسوق...">
       </div>
       <div class="form-group">
         <label class="form-label">السعر *</label>
@@ -1261,10 +1351,19 @@ body {
         <label class="form-label">رابط العرض</label>
         <input class="form-input" id="deal-url" placeholder="https://...">
       </div>
+      <div class="form-group form-full">
+        <label class="form-label">لون الخلفية (اختياري)</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="color" id="deal-bg-color" value="#1a3a5c"
+            style="width:40px;height:36px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:none;padding:2px">
+          <span style="font-size:12px;color:var(--muted)">لون خلفية كرت العرض</span>
+        </div>
+      </div>
     </div>
+
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('addDeal')">إلغاء</button>
-      <button class="btn btn-primary" onclick="saveDeal()">💾 إضافة</button>
+      <button class="btn btn-primary" onclick="saveDeal()">💾 حفظ العرض</button>
     </div>
   </div>
 </div>
@@ -1913,13 +2012,13 @@ function openModal(id, extra) {
     document.getElementById('article-modal-title').textContent = extra==='shop' ? '🛍️ مقال تسوق' : '✈️ مقال سفر';
     document.getElementById('article-type').value = extra || 'travel';
     document.getElementById('article-lang').value = currentBlogLang;
-    ['article-title','article-cat','article-icon','article-read'].forEach(f=>document.getElementById(f).value='');
+    resetArticleModal();
   }
   if (id === 'addDeal') {
     currentDealType = extra || 'travel';
     document.getElementById('deal-modal-title').textContent = extra==='shop' ? '🛍️ عرض تسوق' : '✈️ عرض سفر';
     document.getElementById('deal-type').value = extra || 'travel';
-    ['deal-title','deal-cat','deal-price','deal-savings','deal-icon','deal-url'].forEach(f=>document.getElementById(f).value='');
+    resetDealModal();
   }
   if (id === 'addCategory') {
     if (!editingCategoryId) {
@@ -2054,35 +2153,61 @@ function renderBlog() {
     const items = langData[type] || [];
     document.getElementById(`blog-${type}-list`).innerHTML = items.length
       ? items.map((a,i) => `
-          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
-            <span style="font-size:18px">${a.icon||'📄'}</span>
+          <div class="content-card-preview">
+            ${a.image
+              ? `<img src="${a.image}" alt="${a.title}" onerror="this.style.display='none'">`
+              : `<span style="font-size:24px;width:52px;text-align:center">${a.icon||'📄'}</span>`}
             <div style="flex:1;min-width:0">
               <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.title}</div>
-              <div style="font-size:11px;color:var(--muted)">${a.cat} · ${a.read}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${a.cat||''} ${a.read ? '· '+a.read : ''} · ${a.date||''}</div>
+              ${a.excerpt ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.excerpt}</div>` : ''}
             </div>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteArticle('${type}',${i})">✕</button>
+            <div style="display:flex;gap:4px;flex-shrink:0">
+              ${a.url ? `<a href="${a.url}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="فتح">↗</a>` : ''}
+              <button class="btn btn-danger btn-sm btn-icon" onclick="deleteArticle('${type}',${i})">✕</button>
+            </div>
           </div>`).join('')
-      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد مقالات</div>`;
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد مقالات — أضف أول مقال</div>`;
   });
 }
 
 function saveArticle() {
-  const title = document.getElementById('article-title').value.trim();
-  const cat   = document.getElementById('article-cat').value.trim();
-  const icon  = document.getElementById('article-icon').value.trim() || '📄';
-  const read  = document.getElementById('article-read').value.trim() || '5 دقائق';
-  const lang  = document.getElementById('article-lang').value;
-  const type  = document.getElementById('article-type').value;
+  const title   = document.getElementById('article-title').value.trim();
   if (!title) { toast('❌ اكتب العنوان','error'); return; }
+
+  const cat     = document.getElementById('article-cat').value.trim();
+  const icon    = document.getElementById('article-icon').value.trim() || '📄';
+  const read    = document.getElementById('article-read').value.trim() || '5 دقائق';
+  const lang    = document.getElementById('article-lang').value;
+  const type    = document.getElementById('article-type').value;
+  const url     = document.getElementById('article-url').value.trim();
+  const excerpt = document.getElementById('article-excerpt').value.trim();
+  const content = document.getElementById('article-content').value.trim();
+
+  // الصورة: base64 أو رابط خارجي
+  const imgPreviewEl = document.getElementById('article-img-preview-el');
+  const imgUrl       = document.getElementById('article-img-url').value.trim();
+  let   image        = '';
+  if (imgPreviewEl && imgPreviewEl.src && imgPreviewEl.src.startsWith('data:')) {
+    image = imgPreviewEl.src; // base64
+  } else if (imgUrl) {
+    image = imgUrl;
+  }
+
   const blog = getBlog();
-  if (!blog[lang]) blog[lang] = { travel:[], shop:[] };
-  if (!blog[lang][type]) blog[lang][type] = [];
-  blog[lang][type].push({ title, cat, icon, read, date: new Date().toLocaleDateString('ar-SA') });
+  if (!blog[lang])        blog[lang]        = { travel:[], shop:[] };
+  if (!blog[lang][type])  blog[lang][type]  = [];
+
+  blog[lang][type].push({
+    title, cat, icon, read, url, excerpt, content, image,
+    date: new Date().toLocaleDateString('ar-SA'),
+  });
+
   setBlog(blog);
   currentBlogLang = lang;
   renderBlog();
   closeModal('addArticle');
-  toast('✅ تمت الإضافة');
+  toast('✅ تمت إضافة المقال');
 }
 
 function deleteArticle(type, idx) {
@@ -2120,35 +2245,56 @@ function renderDeals() {
     const items = deals[type] || [];
     document.getElementById(`deals-${type}-list`).innerHTML = items.length
       ? items.map((d,i) => `
-          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
-            <span style="font-size:20px">${d.icon||'🏷️'}</span>
+          <div class="content-card-preview">
+            ${d.image
+              ? `<img src="${d.image}" alt="${d.title}" onerror="this.style.display='none'">`
+              : `<span style="font-size:24px;width:52px;text-align:center;padding:8px 0;display:block">${d.icon||'🏷️'}</span>`}
             <div style="flex:1;min-width:0">
               <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.title}</div>
-              <div style="font-size:11px;color:var(--muted)">${d.cat} · <span style="color:var(--green)">${d.price}</span> · خصم ${d.savings}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${d.cat||''} · <span style="color:var(--green)">${d.price}</span>${d.savings ? ` · خصم ${d.savings}` : ''}</div>
+              ${d.desc ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.desc}</div>` : ''}
             </div>
-            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteDeal('${type}',${i})">✕</button>
+            <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+              <span style="width:16px;height:16px;border-radius:3px;background:${d.bg||'#1a3a5c'};display:inline-block;border:1px solid var(--border)" title="${d.bg}"></span>
+              ${d.url ? `<a href="${d.url}" target="_blank" class="btn btn-ghost btn-sm btn-icon" title="فتح">↗</a>` : ''}
+              <button class="btn btn-danger btn-sm btn-icon" onclick="deleteDeal('${type}',${i})">✕</button>
+            </div>
           </div>`).join('')
-      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد عروض</div>`;
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد عروض — أضف أول عرض</div>`;
   });
 }
 
 function saveDeal() {
   const title   = document.getElementById('deal-title').value.trim();
-  const cat     = document.getElementById('deal-cat').value.trim();
   const price   = document.getElementById('deal-price').value.trim();
+  if (!title || !price) { toast('❌ اكتب العنوان والسعر','error'); return; }
+
+  const cat     = document.getElementById('deal-cat').value.trim();
   const savings = document.getElementById('deal-savings').value.trim();
   const icon    = document.getElementById('deal-icon').value.trim() || '🏷️';
   const url     = document.getElementById('deal-url').value.trim();
+  const desc    = document.getElementById('deal-desc').value.trim();
   const type    = document.getElementById('deal-type').value;
-  if (!title || !price) { toast('❌ اكتب العنوان والسعر','error'); return; }
+  const bg      = document.getElementById('deal-bg-color').value || '#1a3a5c';
+
+  // الصورة
+  const imgPreviewEl = document.getElementById('deal-img-preview-el');
+  const imgUrl       = document.getElementById('deal-img-url').value.trim();
+  let   image        = '';
+  if (imgPreviewEl && imgPreviewEl.src && imgPreviewEl.src.startsWith('data:')) {
+    image = imgPreviewEl.src;
+  } else if (imgUrl) {
+    image = imgUrl;
+  }
+
   const deals = getDeals();
   if (!deals[type]) deals[type] = [];
-  const bgs = { travel:'#1a3a5c', shop:'#1a2a4a' };
-  deals[type].push({ title, cat, price, savings, icon, url, bg: bgs[type] });
+  deals[type].push({ title, cat, price, savings, icon, url, desc, image, bg });
+
   setDeals(deals);
   renderDeals();
   closeModal('addDeal');
-  toast('✅ تمت الإضافة');
+  toast('✅ تمت إضافة العرض');
 }
 
 function deleteDeal(type, idx) {
@@ -2212,7 +2358,118 @@ function renderSectionData(name) {
 }
 
 
+// ─────────────────────────────────────
+// Image Upload Helpers
+// ─────────────────────────────────────
+function previewArticleImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('❌ الصورة أكبر من 2MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('article-img-preview-el').src = e.target.result;
+    document.getElementById('article-img-preview').style.display = 'block';
+    document.getElementById('article-img-placeholder').style.display = 'none';
+    document.getElementById('article-img-url').value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearArticleImage(e) {
+  e.stopPropagation();
+  document.getElementById('article-img-preview-el').src = '';
+  document.getElementById('article-img-preview').style.display = 'none';
+  document.getElementById('article-img-placeholder').style.display = 'block';
+  document.getElementById('article-img-input').value = '';
+  document.getElementById('article-img-url').value = '';
+}
+
+function previewArticleUrl(url) {
+  if (!url) return;
+  document.getElementById('article-img-preview-el').src = url;
+  document.getElementById('article-img-preview').style.display = 'block';
+  document.getElementById('article-img-placeholder').style.display = 'none';
+}
+
+function previewDealImage(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { toast('❌ الصورة أكبر من 2MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('deal-img-preview-el').src = e.target.result;
+    document.getElementById('deal-img-preview').style.display = 'block';
+    document.getElementById('deal-img-placeholder').style.display = 'none';
+    document.getElementById('deal-img-url').value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearDealImage(e) {
+  e.stopPropagation();
+  document.getElementById('deal-img-preview-el').src = '';
+  document.getElementById('deal-img-preview').style.display = 'none';
+  document.getElementById('deal-img-placeholder').style.display = 'block';
+  document.getElementById('deal-img-input').value = '';
+  document.getElementById('deal-img-url').value = '';
+}
+
+function previewDealUrl(url) {
+  if (!url) return;
+  document.getElementById('deal-img-preview-el').src = url;
+  document.getElementById('deal-img-preview').style.display = 'block';
+  document.getElementById('deal-img-placeholder').style.display = 'none';
+}
+
+function setupImageDropZones() {
+  [
+    { zone: 'article-img-drop', input: 'article-img-input', preview: previewArticleImage },
+    { zone: 'deal-img-drop',    input: 'deal-img-input',    preview: previewDealImage   },
+  ].forEach(({ zone, input, preview }) => {
+    const el = document.getElementById(zone);
+    if (!el) return;
+    el.addEventListener('dragover',  (e) => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', ()  => el.classList.remove('drag-over'));
+    el.addEventListener('drop', (e) => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const inp = document.getElementById(input);
+        const dt  = new DataTransfer();
+        dt.items.add(file);
+        inp.files = dt.files;
+        preview(inp);
+      }
+    });
+  });
+}
+
+function resetArticleModal() {
+  ['article-title','article-cat','article-icon','article-read','article-url','article-excerpt','article-content','article-img-url'].forEach(f => {
+    const el = document.getElementById(f);
+    if (el) el.value = '';
+  });
+  document.getElementById('article-img-preview-el').src = '';
+  document.getElementById('article-img-preview').style.display    = 'none';
+  document.getElementById('article-img-placeholder').style.display = 'block';
+  document.getElementById('article-img-input').value = '';
+}
+
+function resetDealModal() {
+  ['deal-title','deal-cat','deal-price','deal-savings','deal-icon','deal-url','deal-desc','deal-img-url'].forEach(f => {
+    const el = document.getElementById(f);
+    if (el) el.value = '';
+  });
+  document.getElementById('deal-img-preview-el').src = '';
+  document.getElementById('deal-img-preview').style.display    = 'none';
+  document.getElementById('deal-img-placeholder').style.display = 'block';
+  document.getElementById('deal-img-input').value = '';
+  document.getElementById('deal-bg-color').value = '#1a3a5c';
+}
+
 loadData();
+setupImageDropZones();
 </script>
 </body>
 </html>
