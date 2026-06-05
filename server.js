@@ -16,53 +16,40 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ────────────────────────────────────
 // 1. تحديد دولة المستخدم عبر IP
 // ────────────────────────────────────
-// ── IP Location cache (in-memory) ──
+// ── IP Location cache + 3 providers ──
 const _locCache = new Map();
-
 const _COUNTRY_INFO = {
-  SA: { currency:'SAR', flag:'🇸🇦', name:'السعودية' },
-  AE: { currency:'AED', flag:'🇦🇪', name:'الإمارات' },
-  EG: { currency:'EGP', flag:'🇪🇬', name:'مصر'      },
-  US: { currency:'USD', flag:'🇺🇸', name:'أمريكا'   },
-  CA: { currency:'CAD', flag:'🇨🇦', name:'كندا'     },
-  KW: { currency:'KWD', flag:'🇰🇼', name:'الكويت'   },
-  QA: { currency:'QAR', flag:'🇶🇦', name:'قطر'      },
-  BH: { currency:'BHD', flag:'🇧🇭', name:'البحرين'  },
-  OM: { currency:'OMR', flag:'🇴🇲', name:'عُمان'    },
-  GB: { currency:'GBP', flag:'🇬🇧', name:'بريطانيا' },
-  DE: { currency:'EUR', flag:'🇩🇪', name:'ألمانيا'  },
+  SA:{currency:'SAR',flag:'🇸🇦',name:'السعودية'}, AE:{currency:'AED',flag:'🇦🇪',name:'الإمارات'},
+  EG:{currency:'EGP',flag:'🇪🇬',name:'مصر'},      US:{currency:'USD',flag:'🇺🇸',name:'أمريكا'},
+  CA:{currency:'CAD',flag:'🇨🇦',name:'كندا'},     KW:{currency:'KWD',flag:'🇰🇼',name:'الكويت'},
+  QA:{currency:'QAR',flag:'🇶🇦',name:'قطر'},      BH:{currency:'BHD',flag:'🇧🇭',name:'البحرين'},
+  OM:{currency:'OMR',flag:'🇴🇲',name:'عُمان'},    GB:{currency:'GBP',flag:'🇬🇧',name:'بريطانيا'},
+  DE:{currency:'EUR',flag:'🇩🇪',name:'ألمانيا'},
 };
-
 async function _safeJsonFetch(url) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 4000);
   try {
-    const r    = await fetch(url, { signal: ctrl.signal });
+    const r = await fetch(url, { signal: ctrl.signal });
     const text = await r.text();
     clearTimeout(t);
     if (!text.trim().startsWith('{')) throw new Error('non-JSON: ' + text.slice(0,40));
     return JSON.parse(text);
   } catch(e) { clearTimeout(t); throw e; }
 }
-
 async function _detectCountry(ip) {
   if (_locCache.has(ip)) return _locCache.get(ip);
-
   const COUNTRY_MAP = config.COUNTRY_MAP || {};
   let country = 'SA';
-
-  // 3 providers — أول واحد يشتغل يُستخدم
   const providers = [
     () => _safeJsonFetch(`http://ip-api.com/json/${ip}?fields=countryCode`).then(d => { if(d.countryCode) return d.countryCode; throw new Error('empty'); }),
     () => _safeJsonFetch(`https://ipwho.is/${ip}`).then(d => { if(d.country_code) return d.country_code; throw new Error('empty'); }),
     () => _safeJsonFetch(`https://ipapi.co/${ip}/json/`).then(d => { if(d.country_code) return d.country_code; throw new Error('empty'); }),
   ];
-
   for (const p of providers) {
     try { country = await p(); break; }
     catch(e) { console.warn('IP provider failed:', e.message); }
   }
-
   const market = COUNTRY_MAP[country] || 'US';
   const info   = _COUNTRY_INFO[country] || _COUNTRY_INFO['US'];
   const result = { country, market, ...info };
@@ -77,9 +64,8 @@ app.get('/api/location', async (req, res) => {
     if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168') || ip.startsWith('10.')) {
       return res.json({ country:'SA', market:'SA', currency:'SAR', flag:'🇸🇦', name:'السعودية' });
     }
-    const result = await _detectCountry(ip);
-    res.json(result);
-  } catch (err) {
+    res.json(await _detectCountry(ip));
+  } catch(err) {
     res.json({ country:'SA', market:'SA', currency:'SAR', flag:'🇸🇦', name:'السعودية' });
   }
 });
@@ -564,6 +550,61 @@ function getMockProducts(query, market, cheaper = false, offset = 0) {
     rating: (4 + Math.random() * 0.9).toFixed(1),
   }));
 }
+
+// ────────────────────────────────────
+// Content API (نصائح + مقالات + عروض)
+// ────────────────────────────────────
+const fs   = require('fs');
+const DATA_FILE = process.env.DATA_PATH
+  ? require('path').join(process.env.DATA_PATH, 'content.json')
+  : require('path').join(__dirname, 'data', 'content.json');
+
+const DEFAULT_CONTENT = {
+  tips:         { ar:[], en:[], de:[] },
+  blog:         { ar:{travel:[],shop:[]}, en:{travel:[],shop:[]}, de:{travel:[],shop:[]} },
+  manual_deals: { travel:[], shop:[] },
+};
+
+function readContent() {
+  try {
+    if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+  } catch(e) { console.error('content read:', e.message); }
+  return DEFAULT_CONTENT;
+}
+
+function writeContent(data) {
+  try {
+    const dir = require('path').dirname(DATA_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive:true });
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    return true;
+  } catch(e) { console.error('content write:', e.message); return false; }
+}
+
+// GET — عام (للفرونت)
+app.get('/api/admin/content', (req, res) => {
+  res.json(readContent());
+});
+
+// POST — أدمن فقط
+app.post('/api/admin/content', (req, res) => {
+  const pass = req.headers['x-admin-password'];
+  if (pass !== (process.env.ADMIN_PASSWORD || 'fetchli2026')) {
+    return res.status(401).json({ error: 'غير مصرح' });
+  }
+  const { type, data } = req.body;
+  if (!type || !data) return res.status(400).json({ error: 'type و data مطلوبان' });
+
+  const content = readContent();
+  if      (type === 'tips')  content.tips         = data;
+  else if (type === 'blog')  content.blog         = data;
+  else if (type === 'deals') content.manual_deals = data;
+  else return res.status(400).json({ error: 'نوع غير معروف' });
+
+  writeContent(content)
+    ? res.json({ ok:true })
+    : res.status(500).json({ error: 'فشل الحفظ — تحقق من Render Disk' });
+});
 
 // ────────────────────────────────────
 // تشغيل السيرفر
