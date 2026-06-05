@@ -1,149 +1,947 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>fetchli — مساعدك الذكي للتسوق والسفر</title>
-  <meta name="description" content="fetchli — مساعد ذكي للتسوق والسفر، ابحث عن أي منتج أو رحلة بالصورة أو النص">
-<meta name="agd-partner-manual-verification" />
-  <!-- Favicon -->
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="apple-touch-icon" href="FLOGO.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fetchli — قارن وتسوق وسافر</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primary:#0057FF;--primary-dark:#0040CC;--accent:#FF3D6E;--gold:#FFB800;
+  --dark:#0A0F1E;--darker:#060A14;--card:#111827;--card2:#1a2235;
+  --text:#E8EDF5;--muted:#8A97B0;--border:#1E2D45;--green:#00D97E;
+  --teal:#0d9488;--teal-dark:#0a7a70;--shop:#2f7dd4;--shop-dark:#1a5fa8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Cairo',sans-serif;background:var(--dark);color:var(--text);overflow-x:hidden}
+[dir="ltr"] body{font-family:'Inter',sans-serif}
 
-  <!-- Travelpayouts Drive -->
-  <script nowprocket data-noptimize="1" data-cfasync="false" data-wpfc-render="false" seraph-accel-crit="1" data-no-defer="1">
-    (function () {
-      var script = document.createElement("script");
-      script.async = 1;
-      script.src = 'https://tp-em.com/NTM1MjAx.js?t=535201';
-      document.head.appendChild(script);
-    })();
-  </script>
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:200;background:rgba(10,15,30,0.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;padding:0 20px;gap:12px}
+.logo{font-size:22px;font-weight:900;color:#fff;letter-spacing:-1px;cursor:pointer;flex-shrink:0}
+.logo span{color:var(--primary)}
+.nav-links{display:flex;gap:20px;list-style:none;flex:1;justify-content:center}
+.nav-links a{color:var(--muted);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s;cursor:pointer}
+.nav-links a:hover{color:#fff}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.loc-pill{display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;background:var(--card2);border:1px solid var(--border);font-size:12px;color:var(--muted)}
+.lang-switcher{display:flex;gap:3px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:3px}
+.lang-btn{padding:3px 9px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:700;cursor:pointer;border-radius:5px;transition:all .2s;font-family:inherit}
+.lang-btn.active{background:var(--primary);color:#fff}
 
-  <link rel="stylesheet" href="style.css">
+/* ── HERO ── */
+.hero{min-height:100vh;padding-top:60px;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.hero-bg{position:absolute;inset:0;background:var(--darker);transition:background .6s ease}
+.hero-bg.shop{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(47,125,212,.18) 0%,transparent 65%),var(--darker)}
+.hero-bg.travel{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(13,148,136,.18) 0%,transparent 65%),var(--darker)}
+.hero-content{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;padding:56px 20px 32px;text-align:center}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:100px;padding:5px 14px;font-size:12px;color:var(--muted);margin-bottom:20px;animation:fadeUp .5s ease both}
+.hero-title{font-size:clamp(28px,6vw,60px);font-weight:900;line-height:1.1;letter-spacing:-2px;margin-bottom:12px;animation:fadeUp .5s ease .1s both}
+.hero-sub{font-size:15px;color:var(--muted);max-width:460px;line-height:1.7;margin-bottom:36px;animation:fadeUp .5s ease .15s both}
+
+/* ── MODE SELECTOR (BIG) ── */
+.mode-selector{position:relative;z-index:2;display:flex;gap:16px;padding:0 20px 36px;justify-content:center;animation:fadeUp .5s ease .2s both;flex-wrap:wrap}
+.mode-card{width:200px;padding:24px 20px;border-radius:20px;border:2px solid var(--border);background:var(--card);cursor:pointer;transition:all .3s ease;text-align:center;position:relative;overflow:hidden}
+.mode-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s}
+.mode-card.shop-card::before{background:linear-gradient(135deg,rgba(47,125,212,.15),transparent)}
+.mode-card.travel-card::before{background:linear-gradient(135deg,rgba(13,148,136,.15),transparent)}
+.mode-card:hover{transform:translateY(-4px)}
+.mode-card.active-shop{border-color:var(--shop);box-shadow:0 0 0 1px var(--shop),0 16px 40px rgba(47,125,212,.25)}
+.mode-card.active-shop::before{opacity:1}
+.mode-card.active-travel{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal),0 16px 40px rgba(13,148,136,.25)}
+.mode-card.active-travel::before{opacity:1}
+.mode-icon{font-size:44px;margin-bottom:12px;display:block}
+.mode-label{font-size:18px;font-weight:900;margin-bottom:5px}
+.mode-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.mode-check{position:absolute;top:12px;left:12px;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;opacity:0;transition:opacity .2s}
+[dir="ltr"] .mode-check{left:auto;right:12px}
+.active-shop .mode-check,.active-travel .mode-check{opacity:1}
+.active-shop .mode-check{background:var(--shop);color:#fff}
+.active-travel .mode-check{background:var(--teal);color:#fff}
+
+/* ── SEARCH BOX (travel) ── */
+.search-section{position:relative;z-index:2;padding:0 16px 36px}
+.search-box{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:20px;max-width:820px;margin:0 auto;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.search-tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:14px;flex-wrap:wrap}
+.tab-btn{padding:7px 16px;border-radius:8px;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.tab-btn.active{background:var(--teal);color:#fff}
+.tab-btn:hover:not(.active){background:var(--card2);color:var(--text)}
+.search-form{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end}
+.form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.form-group input,.form-group select{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border-color .2s}
+.form-group input:focus,.form-group select:focus{border-color:var(--teal)}
+.form-group input::placeholder{color:var(--muted)}
+.search-btn{background:var(--teal);color:#fff;border:none;border-radius:9px;padding:11px 22px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
+.search-btn:hover{background:var(--teal-dark);transform:translateY(-1px)}
+
+/* ── CHAT SECTION ── */
+.chat-section{position:relative;z-index:2;padding:0 16px 36px}
+.chat-container{max-width:820px;margin:0 auto}
+.chat-mode-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.chat-mode-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+.chat-mode-label{font-size:12px;color:var(--muted);font-weight:600}
+.chat-box{background:var(--card);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:0 16px 50px rgba(0,0,0,.4)}
+.chat-area{min-height:200px;max-height:320px;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+.chat-area::-webkit-scrollbar{width:3px}
+.chat-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.msg-row{display:flex;gap:8px;align-items:flex-start}
+.msg-row.user{flex-direction:row-reverse}
+.msg-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.msg-avatar.ai{background:linear-gradient(135deg,var(--shop),var(--accent))}
+.msg-avatar.ai.travel-mode{background:linear-gradient(135deg,var(--teal),#06b6d4)}
+.msg-avatar.user{background:var(--card2);border:1px solid var(--border)}
+.msg-bubble{max-width:78%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.55}
+.msg-bubble.ai{background:var(--card2);border:1px solid var(--border);border-radius:4px 14px 14px 14px}
+.msg-bubble.user{background:var(--shop);border-radius:14px 4px 14px 14px}
+.msg-bubble.user.travel-mode{background:var(--teal)}
+[dir="ltr"] .msg-bubble.ai{border-radius:14px 14px 14px 4px}
+[dir="ltr"] .msg-bubble.user{border-radius:14px 14px 4px 14px}
+.typing-bubble{display:flex;gap:4px;padding:10px 14px;background:var(--card2);border:1px solid var(--border);border-radius:4px 14px 14px 14px;width:fit-content}
+.typing-bubble span{width:5px;height:5px;background:var(--muted);border-radius:50%;animation:bounce .8s infinite}
+.typing-bubble span:nth-child(2){animation-delay:.15s}
+.typing-bubble span:nth-child(3){animation-delay:.3s}
+.typing-label{font-size:11px;color:var(--muted);margin-top:4px}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+.chat-chips{display:flex;gap:8px;padding:10px 16px;overflow-x:auto;scrollbar-width:none;border-top:1px solid var(--border)}
+.chat-chips::-webkit-scrollbar{display:none}
+.chip{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-family:inherit;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+.chip:hover{border-color:var(--shop);background:rgba(47,125,212,.1)}
+.chip.travel-chip:hover{border-color:var(--teal);background:rgba(13,148,136,.1)}
+.chat-input-row{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--border)}
+.chat-input-row input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border-color .2s}
+.chat-input-row input:focus{border-color:var(--shop)}
+.chat-input-row input.travel-input:focus{border-color:var(--teal)}
+.chat-input-row input::placeholder{color:var(--muted)}
+.img-btn{background:var(--card2);color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:0 13px;cursor:pointer;font-size:15px;height:42px;display:flex;align-items:center;transition:all .2s}
+.img-btn:hover{border-color:var(--primary);color:var(--text)}
+.send-btn{color:#fff;border:none;border-radius:10px;padding:0 16px;cursor:pointer;font-size:15px;height:42px;display:flex;align-items:center;transition:background .2s}
+.send-btn.shop-send{background:var(--shop)}
+.send-btn.shop-send:hover{background:var(--shop-dark)}
+.send-btn.travel-send{background:var(--teal)}
+.send-btn.travel-send:hover{background:var(--teal-dark)}
+
+/* products */
+.products-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;width:100%}
+.product-card{background:var(--darker);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.product-img{width:100%;height:85px;object-fit:cover;background:var(--card2)}
+.product-body{padding:8px}
+.product-name{font-size:11px;font-weight:600;line-height:1.3;margin-bottom:3px;color:var(--text)}
+.product-store{font-size:10px;color:var(--muted);margin-bottom:3px}
+.product-price{font-size:12px;font-weight:700;color:var(--green);margin-bottom:5px}
+.btn-buy{display:block;color:#fff;text-decoration:none;font-size:10px;padding:4px 8px;border-radius:6px;font-weight:600;text-align:center}
+.btn-buy.shop-buy{background:var(--shop)}
+.btn-buy.travel-buy{background:var(--teal)}
+.img-preview{max-width:160px;border-radius:10px;border:1px solid var(--border)}
+
+/* ── STATS ── */
+.stats-bar{display:flex;justify-content:center;gap:40px;padding:30px 20px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(17,24,39,.5);flex-wrap:wrap}
+.stat-item{text-align:center}
+.stat-num{font-size:26px;font-weight:900;color:#fff;letter-spacing:-1px}
+.stat-num span{color:var(--primary)}
+.stat-label{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* TRUSTED */
+.trusted{background:var(--card);border-bottom:1px solid var(--border);padding:20px;text-align:center}
+.trusted-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:12px;font-weight:600}
+.trusted-logos{display:flex;justify-content:center;align-items:center;gap:24px;flex-wrap:wrap}
+.trusted-logo{font-size:13px;font-weight:700;color:var(--muted);opacity:.5;transition:opacity .2s}
+.trusted-logo:hover{opacity:1}
+
+/* ── MAIN LAYOUT ── */
+.main-layout{max-width:1160px;margin:0 auto;padding:44px 20px;display:grid;grid-template-columns:1fr 300px;gap:28px}
+.section-title{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title::before{content:'';width:3px;height:17px;border-radius:3px;display:inline-block;flex-shrink:0}
+.section-title.shop-title::before{background:var(--shop)}
+.section-title.travel-title::before{background:var(--teal)}
+
+/* deals */
+.deals-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:36px}
+.deal-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:transform .2s,border-color .2s;cursor:pointer;text-decoration:none;color:inherit;display:block}
+.deal-card:hover{transform:translateY(-3px)}
+.deal-card.shop-card:hover{border-color:var(--shop)}
+.deal-card.travel-card:hover{border-color:var(--teal)}
+.deal-thumb{width:100%;height:138px;display:flex;align-items:center;justify-content:center;font-size:40px}
+.deal-body{padding:12px}
+.deal-location{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.deal-location.shop-loc{color:var(--shop)}
+.deal-location.travel-loc{color:var(--teal)}
+.deal-title{font-size:13px;font-weight:700;margin-bottom:7px;line-height:1.3}
+.deal-meta{display:flex;justify-content:space-between;align-items:center}
+.deal-price{font-size:15px;font-weight:900;color:var(--green)}
+.deal-price small{font-size:10px;color:var(--muted);font-weight:400}
+.deal-savings{background:rgba(255,184,0,.12);color:var(--gold);font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px}
+
+/* articles */
+.articles-list{display:flex;flex-direction:column;gap:12px}
+.article-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;gap:12px;transition:border-color .2s;cursor:pointer;text-decoration:none;color:inherit}
+.article-card.shop-article:hover{border-color:var(--shop)}
+.article-card.travel-article:hover{border-color:var(--teal)}
+.article-thumb{width:62px;height:62px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:25px;background:var(--card2)}
+.article-category{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.article-category.shop-cat{color:var(--accent)}
+.article-category.travel-cat{color:var(--teal)}
+.article-title{font-size:13px;font-weight:700;line-height:1.4;margin-bottom:3px}
+.article-meta{font-size:11px;color:var(--muted)}
+
+/* sidebar */
+.sidebar{display:flex;flex-direction:column;gap:16px}
+.sidebar-widget{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+.widget-title{font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.quick-search-form{display:flex;flex-direction:column;gap:7px}
+.quick-search-form input,.quick-search-form select{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:inherit;font-size:12px;outline:none;width:100%}
+.qsearch-btn{color:#fff;border:none;border-radius:8px;padding:10px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;width:100%}
+.qsearch-btn.shop-qbtn{background:var(--shop)}
+.qsearch-btn.travel-qbtn{background:var(--teal)}
+.dest-list{display:flex;flex-direction:column;gap:6px}
+.dest-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:9px;background:var(--card2);cursor:pointer;transition:background .2s}
+.dest-item:hover{background:#1f3050}
+.dest-icon{font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.dest-info{flex:1;min-width:0}
+.dest-name{font-size:12px;font-weight:600}
+.dest-price{font-size:10px;font-weight:600}
+.dest-price.shop-price{color:var(--accent)}
+.dest-price.travel-price{color:var(--green)}
+.promo-banner{border-radius:14px;padding:16px;text-align:center;position:relative;overflow:hidden}
+.promo-banner.shop-promo{background:linear-gradient(135deg,var(--shop),var(--shop-dark))}
+.promo-banner.travel-promo{background:linear-gradient(135deg,var(--teal),var(--teal-dark))}
+.promo-banner::before{content:'';position:absolute;top:-15px;right:-15px;width:70px;height:70px;background:rgba(255,255,255,.07);border-radius:50%}
+.promo-title{font-size:15px;font-weight:900;margin-bottom:5px}
+.promo-sub{font-size:12px;opacity:.8;margin-bottom:12px}
+.promo-btn{background:#fff;border:none;border-radius:8px;padding:8px 18px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.promo-btn.shop-pbtn{color:var(--shop)}
+.promo-btn.travel-pbtn{color:var(--teal)}
+.tip-text{font-size:12px;color:var(--muted);line-height:1.7}
+
+/* HOW */
+.how-wrap{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.how-section{max-width:1160px;margin:0 auto;padding:48px 20px;text-align:center}
+.how-title{font-size:24px;font-weight:900;margin-bottom:8px;letter-spacing:-1px}
+.how-sub{color:var(--muted);font-size:14px;margin-bottom:32px}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step-card{background:var(--darker);border:1px solid var(--border);border-radius:14px;padding:24px 18px}
+.step-num{width:40px;height:40px;border-radius:50%;color:#fff;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.step-num.shop-num{background:var(--shop)}
+.step-num.travel-num{background:var(--teal)}
+.step-icon{font-size:28px;margin-bottom:10px}
+.step-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.6}
+
+/* FOOTER */
+footer{background:var(--darker);border-top:1px solid var(--border);padding:44px 20px 24px}
+.footer-grid{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:30px;margin-bottom:28px}
+.footer-desc{font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px}
+.footer-col h4{font-size:12px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.footer-links{list-style:none;display:flex;flex-direction:column;gap:7px}
+.footer-links a{color:var(--muted);text-decoration:none;font-size:12px;transition:color .2s;cursor:pointer}
+.footer-links a:hover{color:var(--text)}
+.footer-bottom{max-width:1160px;margin:0 auto;border-top:1px solid var(--border);padding-top:18px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+
+/* PAGES */
+.page-section{display:none;max-width:760px;margin:90px auto 60px;padding:0 20px}
+.page-section.active{display:block}
+.page-section h1{font-size:26px;font-weight:900;margin-bottom:5px;letter-spacing:-1px}
+.page-date{font-size:12px;color:var(--muted);margin-bottom:24px}
+.page-section h2{font-size:16px;font-weight:700;margin:20px 0 8px}
+.page-section p{font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:10px;white-space:pre-line}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:768px){
+  .nav-links{display:none}
+  .search-form{grid-template-columns:1fr 1fr}
+  .search-form .search-btn{grid-column:1/-1}
+  .main-layout{grid-template-columns:1fr}
+  .deals-grid{grid-template-columns:1fr}
+  .steps-grid{grid-template-columns:1fr}
+  .footer-grid{grid-template-columns:1fr 1fr}
+  .stats-bar{gap:18px}
+  .mode-card{width:155px;padding:18px 14px}
+  .mode-icon{font-size:36px}
+  .mode-label{font-size:16px}
+}
+</style>
 </head>
 <body>
 
-<!-- ══════════════════════════════
-     Header
-     ══════════════════════════════ -->
-<header class="header">
-
-  <!-- الشعار الفخم -->
-  <div class="logo-wrap">
-    <img src="#" alt="fetchli" class="logo-icon-img"
-         style="width:40px;height:40px;border-radius:12px;object-fit:cover;object-position:right center;flex-shrink:0;">
-    <div>
-      <div class="logo-name">fetchli<span class="logo-dot"></span></div>
-      <div class="logo-sub" id="modeSubtitle"></div>
+<!-- NAV -->
+<nav>
+  <span class="logo" onclick="showPage('home')">Fetch<span>li</span></span>
+  <ul class="nav-links">
+    <li><a onclick="showPage('home')" data-i18n="nav.home">الرئيسية</a></li>
+    <li><a onclick="showPage('blog')" data-i18n="nav.blog">المدونة</a></li>
+    <li><a onclick="showPage('about')" data-i18n="nav.about">من نحن</a></li>
+    <li><a onclick="showPage('contact')" data-i18n="nav.contact">تواصل معنا</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="loc-pill">🇸🇦 <span id="locName">السعودية</span></div>
+    <div class="lang-switcher">
+      <button class="lang-btn active" data-lang="ar" onclick="I18n.set('ar')">ع</button>
+      <button class="lang-btn" data-lang="en" onclick="I18n.set('en')">EN</button>
+      <button class="lang-btn" data-lang="de" onclick="I18n.set('de')">DE</button>
     </div>
   </div>
+</nav>
 
-  <!-- Mode Tabs -->
-  <div class="mode-tabs">
-    <button class="mode-tab active" id="tabShop" onclick="switchMode('shop')"></button>
-    <button class="mode-tab" id="tabTravel" onclick="switchMode('travel')"></button>
-  </div>
+<!-- HOME -->
+<div id="home-content">
 
-  <!-- Location -->
-  <div class="location-badge">
-    <span id="locationFlag">🌍</span>
-    <span id="locationName"></span>
-    <span>▾</span>
-  </div>
+  <section class="hero">
+    <div class="hero-bg shop" id="heroBg"></div>
 
-</header>
-
-<!-- ══════════════════════════════
-     Chat Area
-     ══════════════════════════════ -->
-<div class="chat-area" id="chatArea">
-  <div class="msg-row ai">
-    <div class="msg-avatar ai">
-      <img src="FLOGO.png" alt="fetchli"
-           style="width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:right center;">
+    <!-- HERO TEXT -->
+    <div class="hero-content">
+      <div class="hero-badge" data-i18n="hero.badge">🌟 تسوق وسافر بذكاء</div>
+      <h1 class="hero-title">
+        <span data-i18n="hero.title1">قارن. اختر.</span><br>
+        <span id="heroAccent" class="accent" style="color:var(--shop)" data-i18n="hero.title2">وفّر أكثر</span>
+      </h1>
+      <p class="hero-sub" data-i18n="hero.sub">اختر ما تريد ويساعدك المساعد الذكي في إيجاد أفضل الأسعار</p>
     </div>
-    <div class="msg-bubble ai" id="welcomeMsg"></div>
-  </div>
-</div>
 
-<!-- ══════════════════════════════
-     Chips
-     ══════════════════════════════ -->
-<div class="chips-wrapper">
-  <div class="chips-shop" id="chipsShop" style="display:flex;gap:7px;padding:8px 18px;overflow-x:auto;scrollbar-width:none;"></div>
-  <div class="chips-travel" id="chipsTravel" style="display:none;gap:7px;padding:8px 18px;overflow-x:auto;scrollbar-width:none;"></div>
-</div>
-
-<!-- ══════════════════════════════
-     Input Bar
-     ══════════════════════════════ -->
-<div class="input-bar">
-  <div class="input-inner">
-    <input type="text" id="msgInput" placeholder="">
-    <label for="imageInput" class="btn-img" title="رفع صورة">📷</label>
-    <input type="file" id="imageInput" accept="image/*">
-    <button id="sendBtn">↩</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════
-     Product Modal
-     ══════════════════════════════ -->
-<div class="ministore-overlay" id="ministore">
-  <div class="ministore-panel">
-
-    <div class="ms-header">
-      <div class="ms-store-name">
-        🛍️ <span id="ms-store"></span>
-        <span class="ms-verified" id="ms-verified">✓ موثوق</span>
+    <!-- MODE SELECTOR (BIG CARDS) -->
+    <div class="mode-selector">
+      <div class="mode-card shop-card active-shop" id="shopCard" onclick="setMode('shop')">
+        <div class="mode-check">✓</div>
+        <div class="mode-icon">🛍️</div>
+        <div class="mode-label" data-i18n="mode.shopLabel">تسوق</div>
+        <div class="mode-desc" data-i18n="mode.shopDesc">منتجات، إلكترونيات، ملابس وأكثر</div>
       </div>
-      <button id="ms-close">✕</button>
+      <div class="mode-card travel-card" id="travelCard" onclick="setMode('travel')">
+        <div class="mode-check">✓</div>
+        <div class="mode-icon">✈️</div>
+        <div class="mode-label" data-i18n="mode.travelLabel">سفر</div>
+        <div class="mode-desc" data-i18n="mode.travelDesc">فنادق، سيارات ورحلات حول العالم</div>
+      </div>
     </div>
 
-    <div class="ms-body">
-      <div class="ms-images">
-        <img id="ms-img" src="" alt="">
-        <span class="ms-img-badge" id="ms-badge"></span>
-      </div>
-      <div class="ms-details">
-        <div class="ms-title" id="ms-name"></div>
-        <div class="ms-rating-row">
-          <span class="ms-stars">⭐⭐⭐⭐⭐</span>
-          <span class="ms-rating-num" id="ms-rating"></span>
+    <!-- CHAT (shop mode) -->
+    <div class="chat-section" id="chatSection">
+      <div class="chat-container">
+        <div class="chat-mode-header">
+          <div class="chat-mode-dot"></div>
+          <span class="chat-mode-label" id="chatModeLabel">مساعد التسوق الذكي</span>
         </div>
-        <div class="ms-price-row">
-          <span class="ms-price-main" id="ms-price"></span>
-        </div>
-        <div class="ms-store-row">
-          <span class="ms-store-icon">🏪</span>
-          <div class="ms-store-info">
-            <div class="ms-store-label" id="store-label">المتجر</div>
-            <div class="ms-store-val" id="ms-store-val"></div>
+        <div class="chat-box">
+          <div class="chat-area" id="chatArea"></div>
+          <div class="chat-chips" id="chipsRow"></div>
+          <div class="chat-input-row">
+            <button class="img-btn" onclick="document.getElementById('imageInput').click()">📷</button>
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+            <input type="text" id="msgInput" data-i18n-ph="chat.placeholder" placeholder="اكتب اسم المنتج...">
+            <button class="send-btn shop-send" id="sendBtn" onclick="handleSend()">➤</button>
           </div>
-          <span class="ms-store-badge" id="ms-store-badge">✓ متحقق</span>
         </div>
       </div>
     </div>
 
-    <div class="ms-features">
-      <div class="ms-feature" id="feat-delivery">🚚 توصيل سريع</div>
-      <div class="ms-feature" id="feat-returns">↩️ إرجاع مجاني</div>
-      <div class="ms-feature" id="feat-secure">🔒 دفع آمن</div>
-      <div class="ms-feature" id="feat-original">✅ منتج أصلي</div>
-    </div>
+    </section>
 
-    <div class="ms-footer">
-      <a id="ms-link" href="#" target="_blank" rel="noopener">اشتري الآن ←</a>
-    </div>
-
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-num">500<span>K+</span></div><div class="stat-label" data-i18n="stats.s1">منتج وفندق</div></div>
+    <div class="stat-item"><div class="stat-num">190<span>+</span></div><div class="stat-label" data-i18n="stats.s2">دولة</div></div>
+    <div class="stat-item"><div class="stat-num">30<span>%</span></div><div class="stat-label" data-i18n="stats.s3">متوسط التوفير</div></div>
+    <div class="stat-item"><div class="stat-num">24<span>/7</span></div><div class="stat-label" data-i18n="stats.s4">مقارنة فورية</div></div>
   </div>
+
+  <!-- TRUSTED -->
+  <div class="trusted">
+    <div class="trusted-label" data-i18n="trusted">نقارن الأسعار من</div>
+    <div class="trusted-logos">
+      <span class="trusted-logo">Amazon</span>
+      <span class="trusted-logo">AliExpress</span>
+      <span class="trusted-logo">Booking.com</span>
+      <span class="trusted-logo">Agoda</span>
+      <span class="trusted-logo">Expedia</span>
+      <span class="trusted-logo">Localrent</span>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-layout">
+    <div>
+      <h2 class="section-title shop-title" id="deals-title">🔥 أفضل العروض</h2>
+      <div class="deals-grid" id="deals-grid"></div>
+      <h2 class="section-title shop-title" id="articles-title">📖 من المدونة</h2>
+      <div class="articles-list" id="articles-list"></div>
+    </div>
+    <div class="sidebar">
+      <div class="sidebar-widget">
+        <div class="widget-title" id="sidebar-search-title">🔍 بحث سريع</div>
+        <div class="quick-search-form" id="sidebar-search-form"></div>
+      </div>
+      <div class="promo-banner shop-promo" id="promo-banner">
+        <div class="promo-title" id="promo-title">🎯 عروض اليوم</div>
+        <div class="promo-sub" id="promo-sub">خصومات حتى 60% على المنتجات</div>
+        <button class="promo-btn shop-pbtn" id="promo-btn">استعرض العروض</button>
+      </div>
+      <div class="sidebar-widget">
+        <div class="widget-title" id="sidebar-dest-title">🔥 الأكثر بحثاً</div>
+        <div class="dest-list" id="dest-list"></div>
+      </div>
+      <div class="sidebar-widget">
+        <div class="widget-title" id="tip-title">💡 نصيحة</div>
+        <p class="tip-text" id="tip-text"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-wrap">
+    <div class="how-section">
+      <h2 class="how-title" data-i18n="how.title">كيف يعمل Fetchli؟</h2>
+      <p class="how-sub" data-i18n="how.sub">ثلاث خطوات بسيطة</p>
+      <div class="steps-grid" id="steps-grid"></div>
+    </div>
+  </div>
+
 </div>
 
-<!-- Modules -->
-<script src="modules/shop.js"></script>
-<script src="modules/travel.js"></script>
-<script src="app.js"></script>
+<!-- PAGES -->
+<div id="privacy-page" class="page-section"></div>
+<div id="terms-page" class="page-section"></div>
+<div id="about-page" class="page-section"></div>
+<div id="contact-page" class="page-section"></div>
+<div id="blog-page" class="page-section" style="max-width:960px;margin:90px auto 60px;padding:0 20px"></div>
 
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div>
+      <span class="logo">Fetch<span>li</span></span>
+      <p class="footer-desc" data-i18n="footer.desc"></p>
+    </div>
+    <div class="footer-col"><h4 data-i18n="footer.services">الخدمات</h4><ul class="footer-links" id="footer-services"></ul></div>
+    <div class="footer-col"><h4 data-i18n="footer.company">الشركة</h4><ul class="footer-links" id="footer-company"></ul></div>
+    <div class="footer-col"><h4 data-i18n="footer.legal">القانونية</h4><ul class="footer-links" id="footer-legal"></ul></div>
+  </div>
+  <div class="footer-bottom">
+    <span data-i18n="footer.copy">© 2026 Fetchli</span>
+    <span data-i18n="footer.tagline">تسوق وسفر بذكاء</span>
+  </div>
+</footer>
+
+<script>
+// ═══ DATA ═══
+const T = {
+  ar:{dir:'rtl',lang:'ar',
+    nav:{home:'الرئيسية',blog:'المدونة',about:'من نحن',contact:'تواصل معنا'},
+    hero:{badge:'🌟 تسوق وسافر بذكاء',title1:'قارن. اختر.',title2:'وفّر أكثر',sub:'اختر ما تريد ويساعدك المساعد الذكي في إيجاد أفضل الأسعار'},
+    mode:{shopLabel:'تسوق',shopDesc:'منتجات، إلكترونيات، ملابس وأكثر',travelLabel:'سفر',travelDesc:'فنادق، سيارات ورحلات حول العالم'},
+    search:{hotels:'🏨 فنادق',cars:'🚗 سيارات',flights:'✈️ طيران',destination:'الوجهة',destinationPlaceholder:'الرياض، دبي، مكة...',checkin:'الوصول',checkout:'المغادرة',pickup:'مكان الاستلام',pickupDate:'تاريخ الاستلام',returnDate:'الإرجاع',from:'من',to:'إلى',travelDate:'التاريخ',searchBtn:'🔍 قارن الآن',searchCars:'🔍 قارن السيارات',searchFlights:'🔍 ابحث عن رحلات'},
+    stats:{s1:'منتج وفندق',s2:'دولة حول العالم',s3:'متوسط التوفير',s4:'مقارنة فورية'},
+    trusted:'نقارن الأسعار من',
+    shop:{
+      deals:{title:'🔥 أفضل عروض التسوق',save:'خصم',items:[
+        {cat:'إلكترونيات',title:'iPhone 15 Pro Max 256GB',price:'3,299 ر.س',savings:'15%',icon:'📱',bg:'#1a2a4a'},
+        {cat:'ساعات',title:'Samsung Galaxy Watch 6',price:'899 ر.س',savings:'30%',icon:'⌚',bg:'#1a3a2a'},
+        {cat:'أزياء',title:'حقيبة يد فاخرة جلد',price:'450 ر.س',savings:'40%',icon:'👜',bg:'#3a1a2a'},
+        {cat:'عطور',title:'عطر رجالي فاخر 100ml',price:'320 ر.س',savings:'25%',icon:'🌸',bg:'#2a2a1a'},
+      ]},
+      articles:{title:'📖 مدونة التسوق',items:[
+        {cat:'مراجعات',title:'مراجعة iPhone 15 Pro Max — هل يستحق السعر؟',date:'5 يونيو 2026',read:'7 دقائق',icon:'📱'},
+        {cat:'نصائح',title:'كيف تتسوق على Amazon SA وتحصل على أفضل الأسعار',date:'3 يونيو 2026',read:'5 دقائق',icon:'🛍️'},
+        {cat:'مقارنة',title:'Amazon مقابل AliExpress — أيهما أفضل للسوق السعودي؟',date:'1 يونيو 2026',read:'6 دقائق',icon:'⚖️'},
+        {cat:'أزياء',title:'أفضل 10 حقائب نسائية بأسعار مناسبة في 2026',date:'28 مايو 2026',read:'5 دقائق',icon:'👜'},
+      ]},
+      sidebar:{searchTitle:'🔍 ابحث عن منتج',searchBtn:'ابحث الآن',searchPlaceholder:'اسم المنتج...',promoTitle:'🎯 عروض اليوم',promoSub:'خصومات حتى 60% على المنتجات',promoBtn:'استعرض العروض',destTitle:'🔥 الأكثر بحثاً',destinations:[
+        {name:'iPhone 15',price:'خصم 15%',icon:'📱'},
+        {name:'ساعات سامسونج',price:'خصم 30%',icon:'⌚'},
+        {name:'أديداس سامبا',price:'خصم 20%',icon:'👟'},
+        {name:'عطور فاخرة',price:'خصم 25%',icon:'🌸'},
+        {name:'لابتوب Dell',price:'خصم 18%',icon:'💻'},
+      ],tipTitle:'💡 نصيحة التسوق',tip:'قارن السعر على Amazon وAliExpress قبل الشراء. الفرق أحياناً يصل لـ 40% لنفس المنتج.'},
+      steps:[
+        {icon:'🔍',title:'ابحث أو ارفع صورة',desc:'اكتب اسم المنتج أو ارفع صورته وسيحلل المساعد طلبك'},
+        {icon:'⚖️',title:'قارن الأسعار',desc:'نجلب الأسعار من Amazon وAliExpress وغيرها في ثوانٍ'},
+        {icon:'🛒',title:'اشترِ بأفضل سعر',desc:'اختر العرض المناسب وأكمل الشراء على الموقع الرسمي بأمان'},
+      ],
+      chips:['⌚ ساعة رجالي','👜 شنطة شانيل','📱 iPhone 15','🌸 عطر نسائي','👟 أديداس سامبا'],
+      chatLabel:'مساعد التسوق الذكي',
+      chatPlaceholder:'اكتب اسم المنتج أو اسأل عن أي شيء...',
+      chatGreet:'مرحباً! أنا fetchli 🛍️\nأرسل لي اسم أي منتج أو صورته وسأبحث لك في أفضل المتاجر فوراً.',
+    },
+    travel:{
+      deals:{title:'🔥 أفضل عروض السفر',save:'وفّر',perNight:'/ ليلة',items:[
+        {cat:'مكة المكرمة',title:'فندق قريب من الحرم',price:'250 ر.س',savings:'22%',icon:'🕌',bg:'#1a3a5c'},
+        {cat:'دبي',title:'منتجع على البحر',price:'480 ر.س',savings:'35%',icon:'🌴',bg:'#1a4a3a'},
+        {cat:'الرياض',title:'فندق بوتيك وسط المدينة',price:'320 ر.س',savings:'18%',icon:'🏙️',bg:'#3a1a1a'},
+        {cat:'جدة',title:'شقة فندقية على الكورنيش',price:'290 ر.س',savings:'27%',icon:'🌃',bg:'#2a1a4a'},
+      ]},
+      articles:{title:'📖 مدونة السفر',items:[
+        {cat:'دليل السفر',title:'أفضل 10 فنادق في مكة قريبة من الحرم وبأسعار معقولة 2026',date:'5 يونيو 2026',read:'8 دقائق',icon:'🕌'},
+        {cat:'نصائح',title:'كيف توفر 40% على تأجير السيارات في دبي — دليل شامل',date:'3 يونيو 2026',read:'6 دقائق',icon:'🚗'},
+        {cat:'مقارنات',title:'Booking.com مقابل Agoda — أيهما أرخص في السوق السعودي؟',date:'1 يونيو 2026',read:'5 دقائق',icon:'⚖️'},
+        {cat:'وجهات',title:'العلا والطائف: وجهات الصيف الأكثر طلباً في 2026',date:'28 مايو 2026',read:'7 دقائق',icon:'🌴'},
+      ]},
+      sidebar:{searchTitle:'🔍 بحث سريع',searchBtn:'قارن الأسعار',searchPlaceholder:'الوجهة...',promoTitle:'🎯 عروض الصيف',promoSub:'وفّر حتى 40% على يوليو وأغسطس',promoBtn:'استعرض العروض',destTitle:'🌍 الأكثر بحثاً',destinations:[
+        {name:'مكة المكرمة',price:'من 220 ر.س / ليلة',icon:'🕌'},
+        {name:'دبي',price:'من 380 ر.س / ليلة',icon:'🌴'},
+        {name:'الرياض',price:'من 280 ر.س / ليلة',icon:'🏙️'},
+        {name:'جدة',price:'من 260 ر.س / ليلة',icon:'🌊'},
+        {name:'الطائف',price:'من 180 ر.س / ليلة',icon:'🏔️'},
+      ],tipTitle:'💡 نصيحة السفر',tip:'احجز الفنادق قبل 21 يوماً للحصول على أفضل الأسعار. الأسعار ترتفع 35% في الأسبوع الأخير.'},
+      steps:[
+        {icon:'🔍',title:'ابحث عن وجهتك',desc:'اكتب المدينة أو الفندق وتواريخ إقامتك وعدد الضيوف'},
+        {icon:'⚖️',title:'قارن الأسعار',desc:'نجلب الأسعار من Booking وAgoda وExpedia وغيرها في ثوانٍ'},
+        {icon:'✅',title:'احجز بأفضل سعر',desc:'اختر العرض المناسب وأكمل الحجز على الموقع الرسمي بأمان'},
+      ],
+      chips:['🏨 فنادق مكة','🚗 سيارات دبي','✈️ رحلات جدة','🌴 منتجعات العلا','🏖️ شرم الشيخ'],
+      chatLabel:'مساعد السفر الذكي',
+      chatPlaceholder:'اسأل عن فنادق، رحلات، أو وجهات...',
+      chatGreet:'مرحباً! أنا مساعد سفر Fetchli ✈️\nاسألني عن فنادق، رحلات، أو تأجير سيارات.',
+    },
+    how:{title:'كيف يعمل Fetchli؟',sub:'ثلاث خطوات بسيطة للحصول على أفضل سعر'},
+    footer:{desc:'محرك مقارنة أسعار التسوق والسفر في الخليج والعالم.',services:'الخدمات',serviceLinks:['مقارنة الفنادق','تأجير السيارات','منتجات التسوق','عروض حصرية'],company:'الشركة',companyLinks:['من نحن','المدونة','تواصل معنا'],legal:'القانونية',legalLinks:['سياسة الخصوصية','شروط الاستخدام'],copy:'© 2026 Fetchli. جميع الحقوق محفوظة.',tagline:'تسوق وسافر بذكاء'},
+    pages:{
+      privacy:{title:'سياسة الخصوصية',date:'آخر تحديث: 1 يونيو 2026',sections:[{h:'المعلومات التي نجمعها',p:'نجمع بيانات التصفح ونوع المتصفح وعنوان IP لتحسين تجربتك.'},{h:'ملفات الكوكيز',p:'نستخدم الكوكيز. المنصات الشريكة تستخدم كوكيزها الخاصة عند التوجيه إليها.'},{h:'مشاركة البيانات',p:'لا نبيع بياناتك. نوجهك للمنصات الشريكة عبر برامج الإحالة الرسمية.'},{h:'التواصل',p:'privacy@fetchli.shop'}]},
+      terms:{title:'شروط الاستخدام',date:'آخر تحديث: 1 يونيو 2026',sections:[{h:'قبول الشروط',p:'باستخدامك الموقع توافق على هذه الشروط.'},{h:'طبيعة الخدمة',p:'Fetchli موقع مقارنة أسعار فقط. لا نجري حجوزات أو مشتريات مباشرة.'},{h:'الروابط الخارجية',p:'غير مسؤولين عن محتوى المواقع الشريكة أو سياساتها.'}]},
+      about:{title:'من نحن',date:'',sections:[{h:'قصتنا',p:'Fetchli وُلد من فكرة بسيطة: لماذا يفتح المسافر والمتسوق 10 تبويبات ليجد أفضل سعر؟'},{h:'مهمتنا',p:'نجلب أفضل أسعار الفنادق والمنتجات وتأجير السيارات في مكان واحد ذكي.'},{h:'شركاؤنا',p:'Amazon • AliExpress • Booking.com • Agoda • Expedia • Localrent • Viator'}]},
+      contact:{title:'تواصل معنا',date:'',sections:[{h:'البريد الإلكتروني',p:'📧 info@fetchli.shop\n📧 support@fetchli.shop'},{h:'للشراكات',p:'📧 partners@fetchli.shop'},{h:'وقت الاستجابة',p:'نرد خلال 24-48 ساعة في أيام العمل.'}]},
+    }
+  },
+  en:{dir:'ltr',lang:'en',
+    nav:{home:'Home',blog:'Blog',about:'About',contact:'Contact'},
+    hero:{badge:'🌟 Shop & Travel Smart',title1:'Compare. Choose.',title2:'Save More',sub:'Choose what you need and let our AI find you the best prices'},
+    mode:{shopLabel:'Shop',shopDesc:'Products, electronics, fashion & more',travelLabel:'Travel',travelDesc:'Hotels, cars & flights worldwide'},
+    search:{hotels:'🏨 Hotels',cars:'🚗 Cars',flights:'✈️ Flights',destination:'Destination',destinationPlaceholder:'Riyadh, Dubai, London...',checkin:'Check-in',checkout:'Check-out',pickup:'Pickup',pickupDate:'Pickup Date',returnDate:'Return',from:'From',to:'To',travelDate:'Date',searchBtn:'🔍 Compare Now',searchCars:'🔍 Compare Cars',searchFlights:'🔍 Search Flights'},
+    stats:{s1:'Products & Hotels',s2:'Countries Worldwide',s3:'Average Savings',s4:'Real-time Comparison'},
+    trusted:'We compare prices from',
+    shop:{
+      deals:{title:'🔥 Best Shopping Deals',save:'Off',items:[
+        {cat:'Electronics',title:'iPhone 15 Pro Max 256GB',price:'$879',savings:'15%',icon:'📱',bg:'#1a2a4a'},
+        {cat:'Watches',title:'Samsung Galaxy Watch 6',price:'$239',savings:'30%',icon:'⌚',bg:'#1a3a2a'},
+        {cat:'Fashion',title:'Luxury Leather Handbag',price:'$120',savings:'40%',icon:'👜',bg:'#3a1a2a'},
+        {cat:'Fragrance',title:'Men\'s Luxury Perfume 100ml',price:'$85',savings:'25%',icon:'🌸',bg:'#2a2a1a'},
+      ]},
+      articles:{title:'📖 Shopping Blog',items:[
+        {cat:'Reviews',title:'iPhone 15 Pro Max Review — Is It Worth the Price?',date:'June 5, 2026',read:'7 min',icon:'📱'},
+        {cat:'Tips',title:'How to Shop on Amazon SA and Get the Best Prices',date:'June 3, 2026',read:'5 min',icon:'🛍️'},
+        {cat:'Comparison',title:'Amazon vs AliExpress — Which is Better for Saudi Market?',date:'June 1, 2026',read:'6 min',icon:'⚖️'},
+        {cat:'Fashion',title:'Top 10 Women\'s Handbags at Affordable Prices in 2026',date:'May 28, 2026',read:'5 min',icon:'👜'},
+      ]},
+      sidebar:{searchTitle:'🔍 Search Products',searchBtn:'Search Now',searchPlaceholder:'Product name...',promoTitle:'🎯 Today\'s Deals',promoSub:'Up to 60% off on products',promoBtn:'View Deals',destTitle:'🔥 Trending Searches',destinations:[
+        {name:'iPhone 15',price:'15% off',icon:'📱'},
+        {name:'Samsung Watches',price:'30% off',icon:'⌚'},
+        {name:'Adidas Samba',price:'20% off',icon:'👟'},
+        {name:'Luxury Perfumes',price:'25% off',icon:'🌸'},
+        {name:'Dell Laptop',price:'18% off',icon:'💻'},
+      ],tipTitle:'💡 Shopping Tip',tip:'Compare prices on Amazon and AliExpress before buying. The difference can reach 40% for the same product.'},
+      steps:[
+        {icon:'🔍',title:'Search or Upload Photo',desc:'Type a product name or upload a photo — our AI handles the rest'},
+        {icon:'⚖️',title:'Compare Prices',desc:'We fetch prices from Amazon, AliExpress and more in seconds'},
+        {icon:'🛒',title:'Buy at Best Price',desc:'Choose the best offer and complete your purchase securely'},
+      ],
+      chips:['⌚ Men\'s Watch','👜 Chanel Bag','📱 iPhone 15','🌸 Perfume','👟 Adidas Samba'],
+      chatLabel:'AI Shopping Assistant',chatPlaceholder:'Type a product name or ask anything...',chatGreet:'Hello! I\'m Fetchli 🛍️\nSend me any product name or photo and I\'ll search the best stores instantly.',
+    },
+    travel:{
+      deals:{title:'🔥 Best Travel Deals',save:'Save',perNight:'/ night',items:[
+        {cat:'Mecca',title:'Hotel Near Haram',price:'$66',savings:'22%',icon:'🕌',bg:'#1a3a5c'},
+        {cat:'Dubai',title:'Beachfront Resort',price:'$128',savings:'35%',icon:'🌴',bg:'#1a4a3a'},
+        {cat:'Riyadh',title:'Boutique City Hotel',price:'$85',savings:'18%',icon:'🏙️',bg:'#3a1a1a'},
+        {cat:'Jeddah',title:'Corniche Apartment',price:'$77',savings:'27%',icon:'🌃',bg:'#2a1a4a'},
+      ]},
+      articles:{title:'📖 Travel Blog',items:[
+        {cat:'Guide',title:'Top 10 Hotels Near Haram in Mecca — Best Value 2026',date:'June 5, 2026',read:'8 min',icon:'🕌'},
+        {cat:'Tips',title:'How to Save 40% on Car Rentals in Dubai — Full Guide',date:'June 3, 2026',read:'6 min',icon:'🚗'},
+        {cat:'Comparison',title:'Booking.com vs Agoda — Which is Cheaper in Saudi Arabia?',date:'June 1, 2026',read:'5 min',icon:'⚖️'},
+        {cat:'Destinations',title:'AlUla & Taif: Saudi Arabia\'s Top Summer Spots 2026',date:'May 28, 2026',read:'7 min',icon:'🌴'},
+      ]},
+      sidebar:{searchTitle:'🔍 Quick Search',searchBtn:'Compare Prices',searchPlaceholder:'Destination...',promoTitle:'🎯 Summer Deals',promoSub:'Save up to 40% on July & August',promoBtn:'View Deals',destTitle:'🌍 Popular Destinations',destinations:[
+        {name:'Mecca',price:'From $60 / night',icon:'🕌'},
+        {name:'Dubai',price:'From $100 / night',icon:'🌴'},
+        {name:'Riyadh',price:'From $75 / night',icon:'🏙️'},
+        {name:'Jeddah',price:'From $70 / night',icon:'🌊'},
+        {name:'Taif',price:'From $48 / night',icon:'🏔️'},
+      ],tipTitle:'💡 Travel Tip',tip:'Book hotels at least 21 days in advance. Prices rise 35% in the last week before arrival.'},
+      steps:[
+        {icon:'🔍',title:'Search Your Destination',desc:'Enter city or hotel, travel dates and number of guests'},
+        {icon:'⚖️',title:'Compare Prices',desc:'We fetch prices from Booking, Agoda, Expedia and more in seconds'},
+        {icon:'✅',title:'Book at Best Price',desc:'Choose the best offer and complete your booking securely'},
+      ],
+      chips:['🏨 Mecca Hotels','🚗 Dubai Cars','✈️ Jeddah Flights','🌴 AlUla Resorts','🏖️ Sharm El Sheikh'],
+      chatLabel:'AI Travel Assistant',chatPlaceholder:'Ask about hotels, flights, or destinations...',chatGreet:'Hello! I\'m Fetchli\'s travel assistant ✈️\nAsk me about hotels, flights, or car rentals.',
+    },
+    how:{title:'How Fetchli Works',sub:'Three simple steps to the best price'},
+    footer:{desc:'Shopping and travel price comparison for the Gulf and worldwide.',services:'Services',serviceLinks:['Hotel Comparison','Car Rental','Shopping','Exclusive Deals'],company:'Company',companyLinks:['About Us','Blog','Contact'],legal:'Legal',legalLinks:['Privacy Policy','Terms of Use'],copy:'© 2026 Fetchli. All rights reserved.',tagline:'Shop & Travel Smart'},
+    pages:{
+      privacy:{title:'Privacy Policy',date:'Last updated: June 1, 2026',sections:[{h:'Data We Collect',p:'We collect browsing data, browser type, and IP address to improve your experience.'},{h:'Cookies',p:'We use cookies. Partner platforms use their own cookies when redirected.'},{h:'Data Sharing',p:'We do not sell your data. Users are directed to partners via official affiliate programs.'},{h:'Contact',p:'privacy@fetchli.shop'}]},
+      terms:{title:'Terms of Use',date:'Last updated: June 1, 2026',sections:[{h:'Acceptance',p:'By using Fetchli, you agree to these terms.'},{h:'Nature of Service',p:'Fetchli is a price comparison site. We do not make direct bookings or purchases.'},{h:'External Links',p:'We are not responsible for partner site content or policies.'}]},
+      about:{title:'About Us',date:'',sections:[{h:'Our Story',p:'Fetchli was born from a simple idea: why open 10 tabs to find the best price?'},{h:'Our Mission',p:'We bring together the best hotel, car, and shopping prices in one smart place.'},{h:'Our Partners',p:'Amazon • AliExpress • Booking.com • Agoda • Expedia • Localrent • Viator'}]},
+      contact:{title:'Contact Us',date:'',sections:[{h:'Email',p:'📧 info@fetchli.shop\n📧 support@fetchli.shop'},{h:'Partnerships',p:'📧 partners@fetchli.shop'},{h:'Response Time',p:'We respond within 24-48 hours on business days.'}]},
+    }
+  },
+  de:{dir:'ltr',lang:'de',
+    nav:{home:'Startseite',blog:'Blog',about:'Über uns',contact:'Kontakt'},
+    hero:{badge:'🌟 Smart shoppen & reisen',title1:'Vergleichen. Wählen.',title2:'Mehr sparen',sub:'Wählen Sie was Sie brauchen und lassen Sie unsere KI die besten Preise finden'},
+    mode:{shopLabel:'Shoppen',shopDesc:'Produkte, Elektronik, Mode & mehr',travelLabel:'Reisen',travelDesc:'Hotels, Autos & Flüge weltweit'},
+    search:{hotels:'🏨 Hotels',cars:'🚗 Mietwagen',flights:'✈️ Flüge',destination:'Ziel',destinationPlaceholder:'Riad, Dubai, Berlin...',checkin:'Anreise',checkout:'Abreise',pickup:'Abholort',pickupDate:'Abholdatum',returnDate:'Rückgabe',from:'Von',to:'Nach',travelDate:'Datum',searchBtn:'🔍 Jetzt vergleichen',searchCars:'🔍 Autos vergleichen',searchFlights:'🔍 Flüge suchen'},
+    stats:{s1:'Produkte & Hotels',s2:'Länder weltweit',s3:'Ø Ersparnis',s4:'Echtzeit-Vergleich'},
+    trusted:'Wir vergleichen Preise von',
+    shop:{
+      deals:{title:'🔥 Beste Shopping-Angebote',save:'Rabatt',items:[
+        {cat:'Elektronik',title:'iPhone 15 Pro Max 256GB',price:'€829',savings:'15%',icon:'📱',bg:'#1a2a4a'},
+        {cat:'Uhren',title:'Samsung Galaxy Watch 6',price:'€225',savings:'30%',icon:'⌚',bg:'#1a3a2a'},
+        {cat:'Mode',title:'Luxus-Lederhandtasche',price:'€113',savings:'40%',icon:'👜',bg:'#3a1a2a'},
+        {cat:'Parfüm',title:'Herrenparfüm Luxus 100ml',price:'€80',savings:'25%',icon:'🌸',bg:'#2a2a1a'},
+      ]},
+      articles:{title:'📖 Shopping-Blog',items:[
+        {cat:'Bewertungen',title:'iPhone 15 Pro Max Test — Lohnt sich der Preis?',date:'5. Juni 2026',read:'7 Min.',icon:'📱'},
+        {cat:'Tipps',title:'Wie man bei Amazon SA einkauft und die besten Preise bekommt',date:'3. Juni 2026',read:'5 Min.',icon:'🛍️'},
+        {cat:'Vergleich',title:'Amazon vs. AliExpress — Was ist besser für den Saudi-Markt?',date:'1. Juni 2026',read:'6 Min.',icon:'⚖️'},
+        {cat:'Mode',title:'Top 10 Damenhandtaschen zu erschwinglichen Preisen 2026',date:'28. Mai 2026',read:'5 Min.',icon:'👜'},
+      ]},
+      sidebar:{searchTitle:'🔍 Produkt suchen',searchBtn:'Jetzt suchen',searchPlaceholder:'Produktname...',promoTitle:'🎯 Tagesangebote',promoSub:'Bis zu 60% Rabatt auf Produkte',promoBtn:'Angebote ansehen',destTitle:'🔥 Trendsuchen',destinations:[
+        {name:'iPhone 15',price:'15% Rabatt',icon:'📱'},
+        {name:'Samsung Uhren',price:'30% Rabatt',icon:'⌚'},
+        {name:'Adidas Samba',price:'20% Rabatt',icon:'👟'},
+        {name:'Luxusparfüm',price:'25% Rabatt',icon:'🌸'},
+        {name:'Dell Laptop',price:'18% Rabatt',icon:'💻'},
+      ],tipTitle:'💡 Shopping-Tipp',tip:'Vergleichen Sie Preise auf Amazon und AliExpress vor dem Kauf. Der Unterschied kann 40% betragen.'},
+      steps:[
+        {icon:'🔍',title:'Suchen oder Foto hochladen',desc:'Produktname eingeben oder Foto hochladen — unsere KI erledigt den Rest'},
+        {icon:'⚖️',title:'Preise vergleichen',desc:'Wir holen Preise von Amazon, AliExpress und mehr in Sekunden'},
+        {icon:'🛒',title:'Zum besten Preis kaufen',desc:'Wählen Sie das beste Angebot und kaufen Sie sicher ein'},
+      ],
+      chips:['⌚ Herrenuhr','👜 Chanel Tasche','📱 iPhone 15','🌸 Parfüm','👟 Adidas Samba'],
+      chatLabel:'KI-Shopping-Assistent',chatPlaceholder:'Produktname eingeben oder fragen...',chatGreet:'Hallo! Ich bin Fetchli 🛍️\nSenden Sie mir einen Produktnamen oder ein Foto und ich suche sofort die besten Preise.',
+    },
+    travel:{
+      deals:{title:'🔥 Beste Reiseangebote',save:'Spare',perNight:'/ Nacht',items:[
+        {cat:'Mekka',title:'Hotel nahe Haram',price:'€62',savings:'22%',icon:'🕌',bg:'#1a3a5c'},
+        {cat:'Dubai',title:'Strandresort',price:'€120',savings:'35%',icon:'🌴',bg:'#1a4a3a'},
+        {cat:'Riad',title:'Boutique-Stadthotel',price:'€80',savings:'18%',icon:'🏙️',bg:'#3a1a1a'},
+        {cat:'Dschidda',title:'Corniche-Apartment',price:'€72',savings:'27%',icon:'🌃',bg:'#2a1a4a'},
+      ]},
+      articles:{title:'📖 Reise-Blog',items:[
+        {cat:'Reiseführer',title:'Top 10 Hotels nahe Haram in Mekka — Bestes Preis-Leistungs 2026',date:'5. Juni 2026',read:'8 Min.',icon:'🕌'},
+        {cat:'Tipps',title:'Wie Sie 40% bei Mietwagen in Dubai sparen — vollständiger Leitfaden',date:'3. Juni 2026',read:'6 Min.',icon:'🚗'},
+        {cat:'Vergleich',title:'Booking.com vs. Agoda — Was ist günstiger in Saudi-Arabien?',date:'1. Juni 2026',read:'5 Min.',icon:'⚖️'},
+        {cat:'Reiseziele',title:'AlUla & Taif: Saudi-Arabiens beliebteste Sommerziele 2026',date:'28. Mai 2026',read:'7 Min.',icon:'🌴'},
+      ]},
+      sidebar:{searchTitle:'🔍 Schnellsuche',searchBtn:'Preise vergleichen',searchPlaceholder:'Reiseziel...',promoTitle:'🎯 Sommerangebote',promoSub:'Spare bis zu 40% im Juli & August',promoBtn:'Angebote ansehen',destTitle:'🌍 Beliebte Ziele',destinations:[
+        {name:'Mekka',price:'Ab €58 / Nacht',icon:'🕌'},
+        {name:'Dubai',price:'Ab €95 / Nacht',icon:'🌴'},
+        {name:'Riad',price:'Ab €70 / Nacht',icon:'🏙️'},
+        {name:'Dschidda',price:'Ab €65 / Nacht',icon:'🌊'},
+        {name:'Taif',price:'Ab €45 / Nacht',icon:'🏔️'},
+      ],tipTitle:'💡 Reise-Tipp',tip:'Buchen Sie Hotels mindestens 21 Tage im Voraus. Preise steigen in der letzten Woche um 35%.'},
+      steps:[
+        {icon:'🔍',title:'Ziel suchen',desc:'Stadt oder Hotel, Reisedaten und Gästeanzahl eingeben'},
+        {icon:'⚖️',title:'Preise vergleichen',desc:'Wir holen Preise von Booking, Agoda, Expedia und mehr'},
+        {icon:'✅',title:'Zum besten Preis buchen',desc:'Wählen Sie das beste Angebot und buchen Sie sicher'},
+      ],
+      chips:['🏨 Hotels Mekka','🚗 Mietwagen Dubai','✈️ Flüge Dschidda','🌴 Resorts AlUla','🏖️ Sharm el-Sheikh'],
+      chatLabel:'KI-Reise-Assistent',chatPlaceholder:'Nach Hotels, Flügen oder Zielen fragen...',chatGreet:'Hallo! Ich bin Fetchlis Reise-Assistent ✈️\nFragen Sie mich nach Hotels, Flügen oder Mietwagen.',
+    },
+    how:{title:'Wie Fetchli funktioniert',sub:'Drei einfache Schritte zum besten Preis'},
+    footer:{desc:'Shopping- und Reisepreisvergleich für den Golfraum und weltweit.',services:'Dienste',serviceLinks:['Hotelvergleich','Mietwagen','Shopping','Exklusive Angebote'],company:'Unternehmen',companyLinks:['Über uns','Blog','Kontakt'],legal:'Rechtliches',legalLinks:['Datenschutz','Nutzungsbedingungen'],copy:'© 2026 Fetchli. Alle Rechte vorbehalten.',tagline:'Smart shoppen & reisen'},
+    pages:{
+      privacy:{title:'Datenschutzerklärung',date:'Zuletzt aktualisiert: 1. Juni 2026',sections:[{h:'Gesammelte Daten',p:'Wir sammeln Browserdaten, Browsertyp und IP-Adresse.'},{h:'Cookies',p:'Unsere Website verwendet Cookies. Partnerplattformen nutzen eigene Cookies.'},{h:'Datenweitergabe',p:'Wir verkaufen keine Daten. Nutzer werden über offizielle Partnerprogramme weitergeleitet.'},{h:'Kontakt',p:'privacy@fetchli.shop'}]},
+      terms:{title:'Nutzungsbedingungen',date:'Zuletzt aktualisiert: 1. Juni 2026',sections:[{h:'Akzeptanz',p:'Mit der Nutzung von Fetchli stimmen Sie diesen Bedingungen zu.'},{h:'Dienstleistung',p:'Fetchli ist ein Preisvergleichsportal. Wir nehmen keine direkten Buchungen vor.'},{h:'Externe Links',p:'Wir haften nicht für Inhalte oder Richtlinien von Partnerseiten.'}]},
+      about:{title:'Über uns',date:'',sections:[{h:'Unsere Geschichte',p:'Fetchli entstand aus einer einfachen Idee: Warum 10 Tabs öffnen für den besten Preis?'},{h:'Unsere Mission',p:'Wir bringen die besten Hotel-, Auto- und Shopping-Preise an einem Ort zusammen.'},{h:'Unsere Partner',p:'Amazon • AliExpress • Booking.com • Agoda • Expedia • Localrent • Viator'}]},
+      contact:{title:'Kontakt',date:'',sections:[{h:'E-Mail',p:'📧 info@fetchli.shop\n📧 support@fetchli.shop'},{h:'Partnerschaften',p:'📧 partners@fetchli.shop'},{h:'Antwortzeit',p:'Wir antworten innerhalb von 24-48 Stunden an Werktagen.'}]},
+    }
+  }
+};
+
+// ═══ I18n ═══
+const I18n = {
+  current:'ar',
+  detect(){const s=localStorage.getItem('fl');if(s&&T[s])return s;const n=navigator.language?.split('-')[0];return T[n]?n:'ar';},
+  set(l){if(!T[l])return;this.current=l;localStorage.setItem('fl',l);this.apply();},
+  apply(){
+    const t=T[this.current];
+    document.documentElement.dir=t.dir;document.documentElement.lang=t.lang;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const v=el.dataset.i18n.split('.').reduce((o,k)=>o?.[k],t);
+      if(v!==undefined)el.textContent=v;
+    });
+    document.querySelectorAll('[data-i18n-ph]').forEach(el=>{
+      const v=el.dataset.i18nPh.split('.').reduce((o,k)=>o?.[k],t);
+      if(v!==undefined)el.placeholder=v;
+    });
+    document.querySelectorAll('.lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===this.current));
+    renderAll();
+  },
+  init(){this.current=this.detect();this.apply();}
+};
+
+// ═══ STATE ═══
+let currentMode='shop';
+const API='';
+let userLocation={country:'SA',market:'SA',currency:'SAR',flag:'🇸🇦',name:'السعودية'};
+
+// ═══ SET MODE ═══
+function setMode(mode){
+  currentMode=mode;
+  const t=T[I18n.current];
+  const isShop=mode==='shop';
+
+  // cards
+  document.getElementById('shopCard').className='mode-card shop-card'+(isShop?' active-shop':'');
+  document.getElementById('travelCard').className='mode-card travel-card'+(!isShop?' active-travel':'');
+
+  // bg
+  const bg=document.getElementById('heroBg');
+  bg.className='hero-bg '+(isShop?'shop':'travel');
+
+  // accent color
+  document.getElementById('heroAccent').style.color=isShop?'var(--shop)':'var(--teal)';
+
+  // chat always visible - just update content
+  {
+    document.getElementById('chatModeLabel').textContent=isShop?t.shop.chatLabel:t.travel.chatLabel;
+    document.getElementById('msgInput').placeholder=isShop?t.shop.chatPlaceholder:t.travel.chatPlaceholder;
+    document.getElementById('sendBtn').className=isShop?'send-btn shop-send':'send-btn travel-send';
+    document.getElementById('chatArea').innerHTML='';
+    addMessage('ai',isShop?t.shop.chatGreet:t.travel.chatGreet,false);
+  }
+
+  renderAll();
+}
+
+// ═══ RENDER ALL ═══
+function renderAll(){
+  const t=T[I18n.current];
+  const m=t[currentMode];
+  if(!m)return;
+
+  // section titles
+  const dt=document.getElementById('deals-title');
+  const at=document.getElementById('articles-title');
+  const titleClass=currentMode==='shop'?'section-title shop-title':'section-title travel-title';
+  if(dt){dt.className=titleClass;dt.innerHTML=`<span></span>${m.deals.title}`;}
+  if(at){at.className=titleClass;at.innerHTML=`<span></span>${m.articles.title}`;}
+
+  // deals
+  const dg=document.getElementById('deals-grid');
+  if(dg){
+    const locClass=currentMode==='shop'?'shop-loc':'travel-loc';
+    const cardClass=currentMode==='shop'?'shop-card':'travel-card';
+    dg.innerHTML=m.deals.items.map(d=>`
+      <a href="#" class="deal-card ${cardClass}">
+        <div class="deal-thumb" style="background:linear-gradient(135deg,${d.bg},#060A14)">${d.icon}</div>
+        <div class="deal-body">
+          <div class="deal-location ${locClass}">${d.cat}</div>
+          <div class="deal-title">${d.title}</div>
+          <div class="deal-meta">
+            <div class="deal-price">${d.price}${m.deals.perNight?`<small> ${m.deals.perNight}</small>`:''}</div>
+            <div class="deal-savings">${m.deals.save} ${d.savings}</div>
+          </div>
+        </div>
+      </a>`).join('');
+  }
+
+  // articles
+  const al=document.getElementById('articles-list');
+  if(al){
+    const catClass=currentMode==='shop'?'shop-cat':'travel-cat';
+    const artClass=currentMode==='shop'?'shop-article':'travel-article';
+    al.innerHTML=m.articles.items.map(a=>`
+      <a href="#" class="article-card ${artClass}">
+        <div class="article-thumb">${a.icon}</div>
+        <div>
+          <div class="article-category ${catClass}">${a.cat}</div>
+          <div class="article-title">${a.title}</div>
+          <div class="article-meta">${a.date} · ${a.read}</div>
+        </div>
+      </a>`).join('');
+  }
+
+  // sidebar
+  const sb=m.sidebar;
+  const qf=document.getElementById('sidebar-search-form');
+  const btnClass=currentMode==='shop'?'qsearch-btn shop-qbtn':'qsearch-btn travel-qbtn';
+  document.getElementById('sidebar-search-title').textContent=sb.searchTitle;
+  if(qf)qf.innerHTML=`
+    <input type="text" placeholder="${sb.searchPlaceholder}">
+    <input type="date">
+    <button class="${btnClass}">${sb.searchBtn}</button>`;
+
+  // promo
+  const pb=document.getElementById('promo-banner');
+  if(pb){
+    pb.className=`promo-banner ${currentMode==='shop'?'shop-promo':'travel-promo'}`;
+    document.getElementById('promo-title').textContent=sb.promoTitle;
+    document.getElementById('promo-sub').textContent=sb.promoSub;
+    const pbtn=document.getElementById('promo-btn');
+    pbtn.textContent=sb.promoBtn;
+    pbtn.className=`promo-btn ${currentMode==='shop'?'shop-pbtn':'travel-pbtn'}`;
+  }
+
+  // destinations
+  document.getElementById('sidebar-dest-title').textContent=sb.destTitle;
+  const dl=document.getElementById('dest-list');
+  if(dl){
+    const priceClass=currentMode==='shop'?'shop-price':'travel-price';
+    dl.innerHTML=sb.destinations.map(d=>`
+      <div class="dest-item">
+        <div class="dest-icon">${d.icon}</div>
+        <div class="dest-info">
+          <div class="dest-name">${d.name}</div>
+          <div class="dest-price ${priceClass}">${d.price}</div>
+        </div>
+        <div style="color:var(--muted);font-size:11px">←</div>
+      </div>`).join('');
+  }
+
+  // tip
+  document.getElementById('tip-title').textContent=sb.tipTitle;
+  document.getElementById('tip-text').textContent=sb.tip;
+
+  // steps
+  const sg=document.getElementById('steps-grid');
+  if(sg){
+    const numClass=currentMode==='shop'?'step-num shop-num':'step-num travel-num';
+    sg.innerHTML=m.steps.map((s,i)=>`
+      <div class="step-card">
+        <div class="${numClass}">${i+1}</div>
+        <div class="step-icon">${s.icon}</div>
+        <div class="step-title">${s.title}</div>
+        <div class="step-desc">${s.desc}</div>
+      </div>`).join('');
+  }
+
+  // chips
+  const cr=document.getElementById('chipsRow');
+  if(cr&&m.chips){
+    const chipClass=currentMode==='travel'?'chip travel-chip':'chip';
+    cr.innerHTML=m.chips.map(c=>`<button class="${chipClass}" onclick="sendMessage('${c.replace(/'/g,"\\'")}',null)">${c}</button>`).join('');
+  }
+
+  // footer
+  const fs=document.getElementById('footer-services');
+  if(fs)fs.innerHTML=t.footer.serviceLinks.map(l=>`<li><a href="#">${l}</a></li>`).join('');
+  const fc=document.getElementById('footer-company');
+  if(fc)fc.innerHTML=`<li><a onclick="showPage('about')">${t.footer.companyLinks[0]}</a></li><li><a onclick="showPage('blog')">${t.footer.companyLinks[1]}</a></li><li><a onclick="showPage('contact')">${t.footer.companyLinks[2]}</a></li>`;
+  const fl=document.getElementById('footer-legal');
+  if(fl)fl.innerHTML=`<li><a onclick="showPage('privacy')">${t.footer.legalLinks[0]}</a></li><li><a onclick="showPage('terms')">${t.footer.legalLinks[1]}</a></li>`;
+}
+
+// ═══ CHAT ═══
+async function detectLocation(){
+  try{const r=await fetch(`${API}/api/location`);userLocation=await r.json();document.getElementById('locName').textContent=userLocation.name||userLocation.country;}catch(e){}
+}
+
+function handleSend(){const v=document.getElementById('msgInput').value.trim();if(v)sendMessage(v,null);}
+
+async function sendMessage(text,imageBase64){
+  if(!text&&!imageBase64)return;
+  const wantCheaper=text&&/أرخص|رخيص|بديل|cheaper|budget|alternative/i.test(text);
+  addMessage('user',imageBase64?`📸 ${text||''}`:text,true);
+  document.getElementById('msgInput').value='';
+  showTyping();
+  try{
+    const ar=await fetch(`${API}/api/analyze`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:text,imageBase64,wantCheaper})});
+    const analyzed=await ar.json();
+    const sr=await fetch(`${API}/api/search`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({queries:analyzed.searchQueries||[text],market:userLocation.market||'SA',wantCheaper})});
+    const {products}=await sr.json();
+    let final=products;
+    if(products?.length>3&&analyzed.productType){
+      try{const fr=await fetch(`${API}/api/filter`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({products,originalAnalysis:analyzed,wantCheaper})});const fd=await fr.json();if(fd.products?.length)final=fd.products;}catch(e){}
+    }
+    removeTyping();
+    addMessage('ai',analyzed.reply||(I18n.current==='ar'?`وجدت ${final.length} نتائج`:`Found ${final.length} results`),false);
+    if(final?.length)addProducts(final);
+  }catch(err){removeTyping();addMessage('ai',I18n.current==='ar'?'❌ حدث خطأ، حاول مرة ثانية':'❌ An error occurred',false);}
+}
+
+function addMessage(role,text,isUser){
+  const chat=document.getElementById('chatArea');
+  const row=document.createElement('div');
+  row.className=`msg-row ${role}`;
+  const bubbleClass=isUser?`msg-bubble user${currentMode==='travel'?' travel-mode':''}`:'msg-bubble ai';
+  const avatarClass=`msg-avatar ${role}${!isUser&&currentMode==='travel'?' travel-mode':''}`;
+  row.innerHTML=`<div class="${avatarClass}">${role==='ai'?'✦':'👤'}</div><div class="${bubbleClass}">${text.replace(/\n/g,'<br>')}</div>`;
+  chat.appendChild(row);chat.scrollTop=chat.scrollHeight;
+}
+
+function addImagePreview(src){
+  const chat=document.getElementById('chatArea');
+  const row=document.createElement('div');
+  row.className='msg-row user';
+  row.innerHTML=`<div class="msg-avatar user">👤</div><img src="${src}" class="img-preview">`;
+  chat.appendChild(row);chat.scrollTop=chat.scrollHeight;
+}
+
+function addProducts(products){
+  const chat=document.getElementById('chatArea');
+  const grid=document.createElement('div');
+  grid.className='products-grid';
+  const buyClass=currentMode==='travel'?'btn-buy travel-buy':'btn-buy shop-buy';
+  const buyLabel=I18n.current==='ar'?(currentMode==='travel'?'احجز ←':'شراء ←'):(currentMode==='travel'?'Book →':'Buy →');
+  grid.innerHTML=products.slice(0,4).map(p=>`
+    <div class="product-card">
+      <img src="${p.image}" class="product-img" alt="${p.name}" onerror="this.style.display='none'">
+      <div class="product-body">
+        <div class="product-name">${p.name.slice(0,45)}</div>
+        <div class="product-store">${p.store||''}</div>
+        <div class="product-price">${p.price}</div>
+        <a class="${buyClass}" href="${p.url}" target="_blank" rel="noopener">${buyLabel}</a>
+      </div>
+    </div>`).join('');
+  chat.appendChild(grid);chat.scrollTop=chat.scrollHeight;
+}
+
+function showTyping(){
+  const chat=document.getElementById('chatArea');
+  const el=document.createElement('div');
+  el.id='typing';el.className='msg-row ai';
+  el.innerHTML=`<div class="msg-avatar ai${currentMode==='travel'?' travel-mode':''}">✦</div><div><div class="typing-bubble"><span></span><span></span><span></span></div><div class="typing-label" id="typingLabel">...</div></div>`;
+  chat.appendChild(el);chat.scrollTop=chat.scrollHeight;
+}
+function removeTyping(){document.getElementById('typing')?.remove();}
+
+function switchTab(btn,type){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['hotels','cars','flights'].forEach(t=>{const f=document.getElementById(t+'-form');if(f)f.style.display=t===type?'grid':'none';});
+}
+
+// ═══ PAGES ═══
+function showPage(page){
+  document.getElementById('home-content').style.display=page==='home'?'block':'none';
+  document.querySelectorAll('.page-section').forEach(el=>el.classList.remove('active'));
+  if(page!=='home'){const el=document.getElementById(page+'-page');if(el){el.classList.add('active');renderPage(page);}}
+  window.scrollTo(0,0);
+}
+
+function renderPage(page){
+  const t=T[I18n.current];
+  const el=document.getElementById(page+'-page');
+  if(!el)return;
+  if(page==='blog'){
+    const bgs=['#1a2a4a','#1a4a3a','#3a1a2a','#2a2a1a','#1a3a5c','#3a1a1a'];
+    const items=[...t.shop.articles.items,...t.travel.articles.items];
+    el.innerHTML=`<h1 style="font-size:26px;font-weight:900;margin-bottom:6px">${t.nav.blog}</h1><p class="page-date" style="margin-bottom:20px"></p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    ${items.map((a,i)=>`<a href="#" class="deal-card" style="text-decoration:none">
+      <div class="deal-thumb" style="background:linear-gradient(135deg,${bgs[i%6]},#060A14)">${a.icon}</div>
+      <div class="deal-body"><div class="deal-location" style="color:var(--primary)">${a.cat}</div><div class="deal-title">${a.title}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px">${a.date} · ${a.read}</div></div></a>`).join('')}
+    </div>`;
+    return;
+  }
+  const pd=t.pages[page];
+  if(!pd)return;
+  el.innerHTML=`<h1>${pd.title}</h1>${pd.date?`<p class="page-date">${pd.date}</p>`:''}${pd.sections.map(s=>`<h2>${s.h}</h2><p>${s.p}</p>`).join('')}`;
+}
+
+// ═══ INIT ═══
+document.addEventListener('DOMContentLoaded',()=>{
+  I18n.init();
+  detectLocation();
+  setMode('shop');
+  document.getElementById('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();}});
+  document.getElementById('imageInput').addEventListener('change',e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{addImagePreview(ev.target.result);sendMessage(I18n.current==='ar'?'أبي منتجات مشابهة':'Find similar products',ev.target.result.split(',')[1]);};
+    r.readAsDataURL(f);
+  });
+});
+</script>
 </body>
 </html>
