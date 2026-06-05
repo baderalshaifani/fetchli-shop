@@ -636,7 +636,18 @@ body {
     <span class="nav-icon">▦</span> الإحصائيات
   </a>
 
-  <div class="sidebar-footer">
+  
+    <div class="nav-section">المحتوى</div>
+    <a class="nav-item" onclick="showSection('tips')" id="nav-tips">
+      <span class="nav-icon">💡</span> نصائح اليوم
+    </a>
+    <a class="nav-item" onclick="showSection('blog')" id="nav-blog">
+      <span class="nav-icon">📖</span> المدونة
+    </a>
+    <a class="nav-item" onclick="showSection('deals')" id="nav-deals">
+      <span class="nav-icon">🔥</span> العروض اليدوية
+    </a>
+    <div class="sidebar-footer">
     <div class="version-badge">v2.0.0</div>
     <div style="font-size:11px;color:var(--muted);margin-top:6px">
       <span class="status-dot"></span>السيرفر شغّال
@@ -1689,6 +1700,277 @@ function toast(msg, type = 'success') {
 // ─────────────────────────────────────
 // Init
 // ─────────────────────────────────────
+
+// ═══════════════════════════════════
+// TIPS — نصائح اليوم
+// ═══════════════════════════════════
+let currentTipsLang = 'ar';
+
+function getTips() { return getData('tips') || { ar:[], en:[], de:[] }; }
+function setTips(v) { setData('tips', v); }
+
+function switchTipsLang(lang, el) {
+  currentTipsLang = lang;
+  document.querySelectorAll('#section-tips .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const labels = { ar:'نصائح عربية', en:'English Tips', de:'Deutsche Tipps' };
+  document.getElementById('tips-lang-label').textContent = labels[lang];
+  document.getElementById('tip-lang-select').value = lang;
+  renderTips();
+}
+
+function renderTips() {
+  const tips = getTips()[currentTipsLang] || [];
+  const list = document.getElementById('tips-list');
+  const empty = document.getElementById('tips-empty');
+  if (!tips.length) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  list.innerHTML = tips.map((t,i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--muted);min-width:24px">${i+1}</span>
+      <span style="flex:1;font-size:13px;line-height:1.5">${t}</span>
+      <button class="btn btn-danger btn-sm btn-icon" onclick="deleteTip(${i})">✕</button>
+    </div>`).join('');
+}
+
+function saveTip() {
+  const text = document.getElementById('tip-text-input').value.trim();
+  const lang = document.getElementById('tip-lang-select').value;
+  if (!text) { toast('❌ اكتب النصيحة أولاً','error'); return; }
+  const tips = getTips();
+  tips[lang] = tips[lang] || [];
+  tips[lang].push(text);
+  setTips(tips);
+  currentTipsLang = lang;
+  renderTips();
+  closeModal('addTip');
+  document.getElementById('tip-text-input').value = '';
+  toast('✅ تمت الإضافة');
+}
+
+function deleteTip(idx) {
+  const tips = getTips();
+  tips[currentTipsLang].splice(idx,1);
+  setTips(tips);
+  renderTips();
+  toast('🗑️ تم الحذف');
+}
+
+async function saveTipsToServer() {
+  const tips = getTips();
+  try {
+    const r = await fetch('/api/admin/content', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      body: JSON.stringify({ type:'tips', data: tips })
+    });
+    if(r.ok) toast('✅ تم الحفظ على السيرفر');
+    else toast('❌ خطأ في الحفظ','error');
+  } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
+}
+
+// ═══════════════════════════════════
+// BLOG — المدونة
+// ═══════════════════════════════════
+let currentBlogLang = 'ar';
+let currentArticleType = 'travel';
+
+function getBlog() { return getData('blog') || { ar:{travel:[],shop:[]}, en:{travel:[],shop:[]}, de:{travel:[],shop:[]} }; }
+function setBlog(v) { setData('blog', v); }
+
+function switchBlogLang(lang, el) {
+  currentBlogLang = lang;
+  document.querySelectorAll('#section-blog .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('article-lang').value = lang;
+  renderBlog();
+}
+
+function renderBlog() {
+  const blog = getBlog();
+  const langData = blog[currentBlogLang] || { travel:[], shop:[] };
+  ['travel','shop'].forEach(type => {
+    const items = langData[type] || [];
+    document.getElementById(`blog-${type}-list`).innerHTML = items.length
+      ? items.map((a,i) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+            <span style="font-size:18px">${a.icon||'📄'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.title}</div>
+              <div style="font-size:11px;color:var(--muted)">${a.cat} · ${a.read}</div>
+            </div>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteArticle('${type}',${i})">✕</button>
+          </div>`).join('')
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد مقالات</div>`;
+  });
+}
+
+function openModal(id, extra) {
+  if (id === 'addArticle') {
+    currentArticleType = extra || 'travel';
+    document.getElementById('article-modal-title').textContent = extra==='shop' ? '🛍️ مقال تسوق' : '✈️ مقال سفر';
+    document.getElementById('article-type').value = extra;
+    ['article-title','article-cat','article-icon','article-read'].forEach(f=>document.getElementById(f).value='');
+  }
+  if (id === 'addDeal') {
+    currentDealType = extra || 'travel';
+    document.getElementById('deal-modal-title').textContent = extra==='shop' ? '🛍️ عرض تسوق' : '✈️ عرض سفر';
+    document.getElementById('deal-type').value = extra;
+    ['deal-title','deal-cat','deal-price','deal-savings','deal-icon','deal-url'].forEach(f=>document.getElementById(f).value='');
+  }
+  if (id === 'addTip') {
+    document.getElementById('tip-lang-select').value = currentTipsLang;
+  }
+  if (id === 'addSource') {
+    if (!editingSourceId) {
+      document.getElementById('source-modal-title').textContent = 'إضافة مصدر بحث جديد';
+      ['src-name','src-icon','src-url','src-api-key','src-rate-limit','src-timeout','src-notes']
+        .forEach(f => document.getElementById(f).value = '');
+      clearChips('src-categories-chips', 'src-cat-input');
+    }
+    renderMarketsCheckboxes(editingSourceId ? [] : ['SA','AE']);
+  }
+  if (id === 'addCategory') {
+    if (!editingCategoryId) {
+      document.getElementById('cat-modal-title').textContent = 'إضافة فئة جديدة';
+      ['cat-ar','cat-en'].forEach(f=>document.getElementById(f).value='');
+      clearChips('cat-must-chips','cat-must-input');
+      clearChips('cat-exclude-chips','cat-exclude-input');
+    }
+  }
+  document.getElementById('modal-' + id).classList.add('open');
+}
+
+function saveArticle() {
+  const title = document.getElementById('article-title').value.trim();
+  const cat   = document.getElementById('article-cat').value.trim();
+  const icon  = document.getElementById('article-icon').value.trim() || '📄';
+  const read  = document.getElementById('article-read').value.trim() || '5 دقائق';
+  const lang  = document.getElementById('article-lang').value;
+  const type  = document.getElementById('article-type').value;
+  if (!title) { toast('❌ اكتب العنوان','error'); return; }
+  const blog = getBlog();
+  if (!blog[lang]) blog[lang] = { travel:[], shop:[] };
+  if (!blog[lang][type]) blog[lang][type] = [];
+  blog[lang][type].push({ title, cat, icon, read, date: new Date().toLocaleDateString('ar-SA') });
+  setBlog(blog);
+  currentBlogLang = lang;
+  renderBlog();
+  closeModal('addArticle');
+  toast('✅ تمت الإضافة');
+}
+
+function deleteArticle(type, idx) {
+  const blog = getBlog();
+  blog[currentBlogLang][type].splice(idx,1);
+  setBlog(blog);
+  renderBlog();
+  toast('🗑️ تم الحذف');
+}
+
+async function saveBlogToServer() {
+  const blog = getBlog();
+  try {
+    const r = await fetch('/api/admin/content', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      body: JSON.stringify({ type:'blog', data: blog })
+    });
+    if(r.ok) toast('✅ تم الحفظ على السيرفر');
+    else toast('❌ خطأ في الحفظ','error');
+  } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
+}
+
+// ═══════════════════════════════════
+// DEALS — العروض اليدوية
+// ═══════════════════════════════════
+let currentDealType = 'travel';
+
+function getDeals() { return getData('manual_deals') || { travel:[], shop:[] }; }
+function setDeals(v) { setData('manual_deals', v); }
+
+function renderDeals() {
+  const deals = getDeals();
+  ['travel','shop'].forEach(type => {
+    const items = deals[type] || [];
+    document.getElementById(`deals-${type}-list`).innerHTML = items.length
+      ? items.map((d,i) => `
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+            <span style="font-size:20px">${d.icon||'🏷️'}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.title}</div>
+              <div style="font-size:11px;color:var(--muted)">${d.cat} · <span style="color:var(--green)">${d.price}</span> · خصم ${d.savings}</div>
+            </div>
+            <button class="btn btn-danger btn-sm btn-icon" onclick="deleteDeal('${type}',${i})">✕</button>
+          </div>`).join('')
+      : `<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">لا توجد عروض</div>`;
+  });
+}
+
+function saveDeal() {
+  const title   = document.getElementById('deal-title').value.trim();
+  const cat     = document.getElementById('deal-cat').value.trim();
+  const price   = document.getElementById('deal-price').value.trim();
+  const savings = document.getElementById('deal-savings').value.trim();
+  const icon    = document.getElementById('deal-icon').value.trim() || '🏷️';
+  const url     = document.getElementById('deal-url').value.trim();
+  const type    = document.getElementById('deal-type').value;
+  if (!title || !price) { toast('❌ اكتب العنوان والسعر','error'); return; }
+  const deals = getDeals();
+  if (!deals[type]) deals[type] = [];
+  const bgs = { travel:'#1a3a5c', shop:'#1a2a4a' };
+  deals[type].push({ title, cat, price, savings, icon, url, bg: bgs[type] });
+  setDeals(deals);
+  renderDeals();
+  closeModal('addDeal');
+  toast('✅ تمت الإضافة');
+}
+
+function deleteDeal(type, idx) {
+  const deals = getDeals();
+  deals[type].splice(idx,1);
+  setDeals(deals);
+  renderDeals();
+  toast('🗑️ تم الحذف');
+}
+
+async function saveDealsToServer() {
+  const deals = getDeals();
+  try {
+    const r = await fetch('/api/admin/content', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-admin-password': localStorage.getItem('adminPass')||''},
+      body: JSON.stringify({ type:'deals', data: deals })
+    });
+    if(r.ok) toast('✅ تم الحفظ على السيرفر');
+    else toast('❌ خطأ في الحفظ','error');
+  } catch(e) { toast('❌ تعذر الاتصال بالسيرفر','error'); }
+}
+
+// ═══════════════════════════════════
+// SHOW SECTION — override existing
+// ═══════════════════════════════════
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const sec = document.getElementById('section-' + name);
+  const nav = document.getElementById('nav-' + name);
+  if (sec) { sec.classList.add('active'); renderSectionData(name); }
+  if (nav) nav.classList.add('active');
+}
+
+function renderSectionData(name) {
+  if (name === 'tips')  { renderTips(); }
+  if (name === 'blog')  { renderBlog(); }
+  if (name === 'deals') { renderDeals(); }
+  if (name === 'sources')    renderSources();
+  if (name === 'markets')    renderMarkets();
+  if (name === 'categories') renderCategories();
+  if (name === 'logs')       loadLogs();
+  if (name === 'stats')      renderStats();
+}
+
+
 loadData();
 </script>
 </body>
