@@ -5,9 +5,9 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios    = require('axios');
 
 const app    = express();
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY });
 
-const TOKEN  = process.env.TRAVELPAYOUTS_TOKEN;
+const TOKEN  = process.env.AVIASALES_TOKEN || process.env.TRAVELPAYOUTS_TOKEN;
 const MARKER = process.env.TRAVELPAYOUTS_MARKER || '734923';
 
 app.use(cors());
