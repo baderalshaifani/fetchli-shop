@@ -3,13 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Fetchli — قارن أسعار الفنادق والمنتجات والسيارات">
-<title>Fetchli — قارن وتسوق وسافر</title>
+<meta name="description" content="Fetchli سفر — قارن أسعار الرحلات والفنادق وتأجير السيارات">
+<title>Fetchli سفر — رحلات وفنادق بأفضل سعر</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-<!-- NAV -->
 <nav>
   <span class="logo" onclick="showPage('home')">Fetch<span>li</span></span>
   <ul class="nav-links">
@@ -27,45 +25,36 @@
     </div>
   </div>
 </nav>
-
-<!-- HOME -->
 <div id="home-content">
-
   <section class="hero">
-    <div class="hero-bg shop" id="heroBg"></div>
-
-    <!-- HERO TEXT -->
+    <div class="hero-bg travel" id="heroBg"></div>
     <div class="hero-content">
-      <div class="hero-badge" data-i18n="hero.badge">🌟 تسوق وسافر بذكاء</div>
+      <div class="hero-badge" data-i18n="hero.badge">✈️ سافر بذكاء وبأفضل سعر</div>
       <h1 class="hero-title">
         <span data-i18n="hero.title1">قارن. اختر.</span><br>
-        <span id="heroAccent" class="accent" style="color:var(--shop)" data-i18n="hero.title2">وفّر أكثر</span>
+        <span id="heroAccent" class="accent" style="color:var(--travel)" data-i18n="hero.title2">سافر أكثر</span>
       </h1>
-      <p class="hero-sub" data-i18n="hero.sub">اختر ما تريد ويساعدك المساعد الذكي في إيجاد أفضل الأسعار</p>
+      <p class="hero-sub" data-i18n="hero.sub">اكتب وجهتك ويساعدك المساعد الذكي في إيجاد أفضل رحلات وفنادق</p>
     </div>
-
-    <!-- MODE SELECTOR (BIG CARDS) -->
     <div class="mode-selector">
-      <div class="mode-card shop-card active-shop" id="shopCard" onclick="setMode('shop')">
+      <div class="mode-card shop-card" id="shopCard" onclick="setMode('shop')">
         <div class="mode-check">✓</div>
         <div class="mode-icon">🛍️</div>
         <div class="mode-label" data-i18n="mode.shopLabel">تسوق</div>
         <div class="mode-desc" data-i18n="mode.shopDesc">منتجات، إلكترونيات، ملابس وأكثر</div>
       </div>
-      <div class="mode-card travel-card" id="travelCard" onclick="setMode('travel')">
+      <div class="mode-card travel-card active-travel" id="travelCard" onclick="setMode('travel')">
         <div class="mode-check">✓</div>
         <div class="mode-icon">✈️</div>
         <div class="mode-label" data-i18n="mode.travelLabel">سفر</div>
         <div class="mode-desc" data-i18n="mode.travelDesc">فنادق، سيارات ورحلات حول العالم</div>
       </div>
     </div>
-
-    <!-- CHAT (shop mode) -->
     <div class="chat-section" id="chatSection">
       <div class="chat-container">
         <div class="chat-mode-header">
           <div class="chat-mode-dot"></div>
-          <span class="chat-mode-label" id="chatModeLabel">مساعد التسوق الذكي</span>
+          <span class="chat-mode-label" id="chatModeLabel">مساعد السفر الذكي</span>
         </div>
         <div class="chat-box">
           <div class="chat-area" id="chatArea"></div>
@@ -73,42 +62,35 @@
           <div class="chat-input-row">
             <button class="img-btn" onclick="document.getElementById('imageInput').click()">📷</button>
             <input type="file" id="imageInput" accept="image/*" style="display:none">
-            <input type="text" id="msgInput" data-i18n-ph="chat.placeholder" placeholder="اكتب اسم المنتج...">
-            <button class="send-btn shop-send" id="sendBtn" onclick="handleSend()">➤</button>
+            <input type="text" id="msgInput" data-i18n-ph="chat.placeholder" placeholder="اكتب وجهتك... مثال: أريد رحلة لإسطنبول">
+            <button class="send-btn travel-send" id="sendBtn" onclick="handleSend()">➤</button>
           </div>
         </div>
       </div>
     </div>
-
-    </section>
-
-  <!-- STATS -->
+  </section>
   <div class="stats-bar">
-    <div class="stat-item"><div class="stat-num">500<span>K+</span></div><div class="stat-label" data-i18n="stats.s1">منتج وفندق</div></div>
+    <div class="stat-item"><div class="stat-num">500<span>K+</span></div><div class="stat-label" data-i18n="stats.s1">فندق ورحلة</div></div>
     <div class="stat-item"><div class="stat-num">190<span>+</span></div><div class="stat-label" data-i18n="stats.s2">دولة</div></div>
     <div class="stat-item"><div class="stat-num">30<span>%</span></div><div class="stat-label" data-i18n="stats.s3">متوسط التوفير</div></div>
     <div class="stat-item"><div class="stat-num">24<span>/7</span></div><div class="stat-label" data-i18n="stats.s4">مقارنة فورية</div></div>
   </div>
-
-  <!-- TRUSTED -->
   <div class="trusted">
     <div class="trusted-label" data-i18n="trusted">نقارن الأسعار من</div>
     <div class="trusted-logos">
-      <span class="trusted-logo">Amazon</span>
-      <span class="trusted-logo">AliExpress</span>
-      <span class="trusted-logo">Booking.com</span>
-      <span class="trusted-logo">Agoda</span>
-      <span class="trusted-logo">Expedia</span>
+      <span class="trusted-logo">Aviasales</span>
+      <span class="trusted-logo">Hotellook</span>
       <span class="trusted-logo">Localrent</span>
+      <span class="trusted-logo">GetTransfer</span>
+      <span class="trusted-logo">Trip.com</span>
+      <span class="trusted-logo">Kiwi.com</span>
     </div>
   </div>
-
-  <!-- MAIN CONTENT -->
   <div class="main-layout">
     <div>
-      <h2 class="section-title shop-title" id="deals-title">🔥 أفضل العروض</h2>
+      <h2 class="section-title travel-title" id="deals-title">✈️ أفضل عروض السفر</h2>
       <div class="deals-grid" id="deals-grid"></div>
-      <h2 class="section-title shop-title" id="articles-title">📖 من المدونة</h2>
+      <h2 class="section-title travel-title" id="articles-title">📖 مقالات السفر</h2>
       <div class="articles-list" id="articles-list"></div>
     </div>
     <div class="sidebar">
@@ -116,41 +98,34 @@
         <div class="widget-title" id="sidebar-search-title">🔍 بحث سريع</div>
         <div class="quick-search-form" id="sidebar-search-form"></div>
       </div>
-      <div class="promo-banner shop-promo" id="promo-banner">
-        <div class="promo-title" id="promo-title">🎯 عروض اليوم</div>
-        <div class="promo-sub" id="promo-sub">خصومات حتى 60% على المنتجات</div>
-        <button class="promo-btn shop-pbtn" id="promo-btn">استعرض العروض</button>
+      <div class="promo-banner travel-promo" id="promo-banner">
+        <div class="promo-title" id="promo-title">✈️ عروض اليوم</div>
+        <div class="promo-sub" id="promo-sub">رحلات وفنادق بخصم حتى 40%</div>
+        <button class="promo-btn travel-pbtn" id="promo-btn">استعرض العروض</button>
       </div>
       <div class="sidebar-widget">
-        <div class="widget-title" id="sidebar-dest-title">🔥 الأكثر بحثاً</div>
+        <div class="widget-title" id="sidebar-dest-title">🔥 الوجهات الأكثر بحثاً</div>
         <div class="dest-list" id="dest-list"></div>
       </div>
       <div class="sidebar-widget">
-        <div class="widget-title" id="tip-title">💡 نصيحة</div>
+        <div class="widget-title" id="tip-title">💡 نصيحة سفر</div>
         <p class="tip-text" id="tip-text"></p>
       </div>
     </div>
   </div>
-
-  <!-- HOW IT WORKS -->
   <div class="how-wrap">
     <div class="how-section">
-      <h2 class="how-title" data-i18n="how.title">كيف يعمل Fetchli؟</h2>
+      <h2 class="how-title" data-i18n="how.title">كيف يعمل Fetchli سفر؟</h2>
       <p class="how-sub" data-i18n="how.sub">ثلاث خطوات بسيطة</p>
       <div class="steps-grid" id="steps-grid"></div>
     </div>
   </div>
-
 </div>
-
-<!-- PAGES -->
 <div id="privacy-page" class="page-section"></div>
 <div id="terms-page" class="page-section"></div>
 <div id="about-page" class="page-section"></div>
 <div id="contact-page" class="page-section"></div>
 <div id="blog-page" class="page-section" style="max-width:960px;margin:90px auto 60px;padding:0 20px"></div>
-
-<!-- FOOTER -->
 <footer>
   <div class="footer-grid">
     <div>
@@ -163,10 +138,9 @@
   </div>
   <div class="footer-bottom">
     <span data-i18n="footer.copy">© 2026 Fetchli</span>
-    <span data-i18n="footer.tagline">تسوق وسفر بذكاء</span>
+    <span data-i18n="footer.tagline">سافر بذكاء</span>
   </div>
 </footer>
-
 <script src="app.js"></script>
 </body>
 </html>
