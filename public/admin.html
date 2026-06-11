@@ -762,6 +762,7 @@ body {
             <span class="search-icon">⌕</span>
           </div>
           <button class="btn btn-primary btn-sm" onclick="openModal('addSource')">+ جديد</button>
+          <button class="btn btn-ghost btn-sm" onclick="syncStoresToServer(getSources())">☁️ مزامنة</button>
         </div>
       </div>
       <table class="sources-table" id="sources-table">
@@ -1041,9 +1042,10 @@ body {
           <option value="serpapi_shopping">SerpAPI Shopping</option>
           <option value="serpapi_lens">SerpAPI Lens</option>
           <option value="rainforest">Rainforest API (Amazon)</option>
-          <option value="direct_api">API مباشر</option>
+          <option value="api">API مباشر</option>
+          <option value="feed">Product Feed (Admitad)</option>
+          <option value="deeplink">Deep Link (رابط بحث)</option>
           <option value="scraper">Web Scraper</option>
-          <option value="affiliate">Affiliate RSS/Feed</option>
         </select>
       </div>
       <div class="form-group">
@@ -1059,6 +1061,10 @@ body {
         <label class="form-label">الرابط الأساسي / Base URL</label>
         <input class="form-input" id="src-url" placeholder="https://api.example.com/v1/search">
         <span class="form-hint">اتركه فارغاً إذا كان يعمل عبر SerpAPI</span>
+      </div>
+      <div class="form-group form-full">
+        <label class="form-label">رابط البحث (للـ deeplink) — استخدم {query} مكان كلمة البحث</label>
+        <input class="form-input" id="src-search-url" placeholder="https://www.example.com/search?q={query}">
       </div>
       <div class="form-group form-full" id="src-api-key-group">
         <label class="form-label">مفتاح API (اختياري)</label>
@@ -1596,10 +1602,42 @@ function renderSources(filter = '') {
 
 function filterSources(val) { renderSources(val.toLowerCase()); }
 
+// ── مزامنة المتاجر مع السيرفر ──
+async function syncStoresToServer(sources) {
+  try {
+    const mapped = sources.map(s => ({
+      id:         s.id,
+      name:       s.name,
+      icon:       s.icon,
+      color:      s.color || '#7c6af7',
+      type:       s.type === 'affiliate' ? 'feed' : s.type === 'serpapi_shopping' ? 'api' : s.type,
+      enabled:    s.active !== false,
+      markets:    s.markets || ['SA'],
+      websiteUrl: s.url || '',
+      searchUrl:  s.searchUrl || '',
+      feedUrl:    s.feedUrl || '',
+      notes:      s.notes || '',
+    }));
+    const res = await fetch(`${API}/api/stores`, {
+      method:  'POST',
+      headers: { 'Content-Type':'application/json', 'x-admin-token': ADMIN_PASS },
+      body:    JSON.stringify({ stores: mapped }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      toast('✅ تم حفظ المتاجر في Supabase', 'success');
+    } else {
+      toast('⚠️ خطأ: ' + (data.error||''), 'error');
+    }
+  } catch(e) {
+    toast('⚠️ تعذّر الوصول للسيرفر', 'error');
+  }
+}
+
 function toggleSource(id, active) {
   const sources = getSources();
   const s = sources.find(x => x.id === id);
-  if (s) { s.active = active; setData('sources', sources); }
+  if (s) { s.active = active; setData('sources', sources); syncStoresToServer(sources); }
   toast(active ? `✅ ${s?.name} مفعّل` : `○ ${s?.name} معطّل`, active ? 'success' : 'error');
 }
 
@@ -1607,6 +1645,7 @@ function deleteSource(id) {
   if (!confirm('هل أنت متأكد من الحذف؟')) return;
   const sources = getSources().filter(s => s.id !== id);
   setData('sources', sources);
+  syncStoresToServer(sources);
   renderSources();
   toast('🗑️ تم الحذف', 'success');
 }
@@ -1621,6 +1660,7 @@ function editSource(id) {
   document.getElementById('src-type').value      = s.type;
   document.getElementById('src-priority').value  = s.priority;
   document.getElementById('src-url').value       = s.url || '';
+  document.getElementById('src-search-url').value= s.searchUrl || '';
   document.getElementById('src-rate-limit').value= s.rateLimit || '';
   document.getElementById('src-timeout').value   = s.timeout || '';
   document.getElementById('src-notes').value     = s.notes || '';
@@ -1643,6 +1683,7 @@ function saveSource() {
     icon:      document.getElementById('src-icon').value || '🔗',
     type:      document.getElementById('src-type').value,
     url:       document.getElementById('src-url').value.trim(),
+    searchUrl: document.getElementById('src-search-url').value.trim(),
     priority:  parseInt(document.getElementById('src-priority').value),
     markets:   markets.length ? markets : ['SA'],
     categories:cats,
@@ -1660,6 +1701,7 @@ function saveSource() {
   }
 
   setData('sources', sources);
+  syncStoresToServer(sources);
   closeModal('addSource');
   renderSources();
   toast('✅ تم حفظ المصدر بنجاح', 'success');

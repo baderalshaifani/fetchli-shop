@@ -2,10 +2,13 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<meta name="verify-admitad" content="d5e61ecd1e" />
+<link rel="icon" type="image/png" href="public/img/favicon.svg" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Fetchli — قارن أسعار الفنادق والمنتجات والسيارات">
 <title>Fetchli — قارن وتسوق وسافر</title>
 <link rel="stylesheet" href="style.css">
+
 </head>
 <body>
 
@@ -44,9 +47,9 @@
       <p class="hero-sub" data-i18n="hero.sub">اختر ما تريد ويساعدك المساعد الذكي في إيجاد أفضل الأسعار</p>
     </div>
 
-    <!-- MODE SELECTOR — مخفي، Claude يحدد تلقائياً -->
-    <div class="mode-selector" style="display:none">
-      <div class="mode-card shop-card" id="shopCard" onclick="setMode('shop')">
+    <!-- MODE SELECTOR (BIG CARDS) -->
+    <div class="mode-selector">
+      <div class="mode-card shop-card active-shop" id="shopCard" onclick="setMode('shop')">
         <div class="mode-check">✓</div>
         <div class="mode-icon">🛍️</div>
         <div class="mode-label" data-i18n="mode.shopLabel">تسوق</div>
@@ -60,12 +63,12 @@
       </div>
     </div>
 
-    <!-- CHAT -->
+    <!-- CHAT (shop mode) -->
     <div class="chat-section" id="chatSection">
       <div class="chat-container">
         <div class="chat-mode-header">
           <div class="chat-mode-dot"></div>
-          <span class="chat-mode-label" id="chatModeLabel">مساعد Fetchli الذكي</span>
+          <span class="chat-mode-label" id="chatModeLabel">مساعد التسوق الذكي</span>
         </div>
         <div class="chat-box">
           <div class="chat-area" id="chatArea"></div>
@@ -73,8 +76,8 @@
           <div class="chat-input-row">
             <button class="img-btn" onclick="document.getElementById('imageInput').click()">📷</button>
             <input type="file" id="imageInput" accept="image/*" style="display:none">
-            <input type="text" id="msgInput" placeholder="اكتب ما تريد... تسوق، سفر، أي شيء!">
-            <button class="send-btn travel-send" id="sendBtn" onclick="handleSend()">➤</button>
+            <input type="text" id="msgInput" data-i18n-ph="chat.placeholder" placeholder="اكتب اسم المنتج...">
+            <button class="send-btn shop-send" id="sendBtn" onclick="handleSend()">➤</button>
           </div>
         </div>
       </div>
@@ -167,6 +170,18 @@
   </div>
 </footer>
 
-<script src="app.js"></script>
+<!-- Mini Store Modal -->
+<div id="ministore" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center">
+  <div style="background:#1a1f2e;border-radius:16px;padding:24px;max-width:400px;width:90%;position:relative">
+    <button id="ms-close" style="position:absolute;top:12px;left:12px;background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer">✕</button>
+    <img id="ms-img" src="" style="width:100%;height:200px;object-fit:contain;border-radius:8px;margin-bottom:12px">
+    <div id="ms-name" style="font-weight:700;font-size:1rem;margin-bottom:6px;color:#fff"></div>
+    <div id="ms-store" style="font-size:.85rem;color:#888;margin-bottom:6px"></div>
+    <div id="ms-price" style="font-size:1.3rem;font-weight:800;color:#2f7dd4;margin-bottom:16px"></div>
+    <a id="ms-link" href="#" target="_blank" rel="noopener" style="display:block;text-align:center;background:#2f7dd4;color:#fff;padding:12px;border-radius:8px;text-decoration:none;font-weight:700">اشتري الآن ←</a>
+  </div>
+</div>
+
+<script src="/app.js"></script>
 </body>
 </html>
