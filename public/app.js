@@ -530,7 +530,13 @@ async function sendMessage(text, imageBase64 = null) {
   }
 
   // ── تسوق (الافتراضي) ──
-  await runShopSearch(_conv.context.product || text, imageBase64, _conv.context.wantCheaper || wantCheaper);
+  // مهم: نأخذ منتج هذه الرسالة فقط (من smart-chat لهذا الدور أو نص المستخدم نفسه)
+  // ولا نستخدم product المخزّن من طلب سابق — حتى لا تختلط "شنطة حمراء" مع "جزمة نفس اللون"
+  const productThisTurn = decision?.context?.product || text;
+  await runShopSearch(productThisTurn, imageBase64, decision?.context?.wantCheaper || wantCheaper);
+  // تنظيف: لا نحتفظ بالمنتج بين الطلبات (السياق اللوني/النوعي محفوظ في _analysisHistory)
+  delete _conv.context.product;
+  delete _conv.context.wantCheaper;
 }
 
 // ────────────────────────────────────
